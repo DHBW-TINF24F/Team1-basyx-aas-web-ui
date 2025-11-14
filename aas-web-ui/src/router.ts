@@ -62,6 +62,12 @@ const staticRoutes: Array<RouteRecordRaw> = [
     },
     { path: '/404', name: 'NotFound404', component: Page404, meta: { name: 'Page not found | 404' } },
     { path: '/:pathMatch(.*)*', name: 'NotFound', component: Page404 },
+    {
+        path: '/cdviewer',
+        name: 'CDViewer',
+        component: AASViewer,
+        meta: { name: 'CD Viewer', subtitle: 'Visualize Concept Description' },
+    },
 ];
 
 // Function to generate routes from modules
