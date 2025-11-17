@@ -32,6 +32,7 @@ declare module 'vue' {
     ComponentVisualization: typeof import('./components/ComponentVisualization.vue')['default']
     ConceptDescription: typeof import('./components/UIComponents/ConceptDescription.vue')['default']
     ConceptDescriptionDetailView: typeof import('./components/UIComponents/ConceptDescriptionDetailView.vue')['default']
+    ConceptDescriptionSidebar: typeof import('./components/UIComponents/ConceptDescriptionSidebar.vue')['default']
     ConceptDescriptionTable: typeof import('./components/UIComponents/ConceptDescriptionTable.vue')['default']
     ContactInformations_v1_0: typeof import('./components/Plugins/Submodels/ContactInformations_v1_0.vue')['default']
     DataSpecificationContent: typeof import('./components/UIComponents/DataSpecificationContent.vue')['default']
