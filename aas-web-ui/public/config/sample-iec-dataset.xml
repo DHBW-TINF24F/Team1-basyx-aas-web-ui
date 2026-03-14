@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<iecDataset version="1.0" standard="IEC-61360">
+    <header>
+        <datasetId>IEC-DEMO-2026-001</datasetId>
+        <source>DemoSource</source>
+        <createdAt>2026-03-13T09:30:00Z</createdAt>
+    </header>
+    <records>
+        <record>
+            <id>R-1001</id>
+            <description>Rated voltage</description>
+            <unit>V</unit>
+            <value>400</value>
+        </record>
+        <record>
+            <id>R-1002</id>
+            <description>Rated current</description>
+            <unit>A</unit>
+            <value>16</value>
+        </record>
+    </records>
+</iecDataset>
