@@ -368,6 +368,82 @@ export function buildAttachmentSmePath (smEndpoint: string, idShortPath: string[
   return `${smEndpoint}/submodel-elements/${encodedPath}`
 }
 
+function parseEnvironmentText (environmentText: string, sourceLabel: string): JsonRecord {
+  const trimmedText = environmentText.trim()
+  if (trimmedText === '') {
+    throw new Error(`Environment content in '${sourceLabel}' is empty.`)
+  }
+
+  try {
+    const parsedJson = JSON.parse(trimmedText)
+    const environment = asRecord(parsedJson)
+    if (!environment) {
+      throw new Error(`Environment payload in '${sourceLabel}' is not an object.`)
+    }
+
+    return environment
+  } catch {
+    try {
+      const xmlEnvironment = deserializeXml(trimmedText)
+      const environment = aasCore.jsonization.toJsonable(xmlEnvironment as unknown as aasCore.types.Class)
+      const environmentRecord = asRecord(environment)
+      if (!environmentRecord) {
+        throw new Error(`Environment XML payload in '${sourceLabel}' is invalid.`)
+      }
+
+      return environmentRecord
+    } catch (xmlError) {
+      throw new Error(
+        `Failed to parse environment in '${sourceLabel}' as JSON or XML: ${stringifyUnknown(xmlError)}`,
+        {
+          cause: xmlError,
+        },
+      )
+    }
+  }
+}
+
+export type ExtractCdsResult = {
+  cdById: Map<string, { core: aasCore.types.ConceptDescription, json: JsonRecord }>
+  warnings: string[]
+}
+
+export async function extractCdsFromAasx (file: File): Promise<ExtractCdsResult> {
+  const warnings: string[] = []
+  const cdById = new Map<string, { core: aasCore.types.ConceptDescription, json: JsonRecord }>()
+
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const packaging = NewPackaging()
+  const pkg = await packaging.OpenReadFromBytes(bytes)
+
+  try {
+    const specs = await pkg.Specs()
+    if (specs.length === 0) {
+      warnings.push(`No AAS environment spec found in '${file.name}'.`)
+      return { cdById, warnings }
+    }
+
+    for (const spec of specs) {
+      const environment = parseEnvironmentText(spec.ReadAllText(), `${file.name}:${spec.URI.pathname}`)
+      for (const cdEntry of asArray(environment.conceptDescriptions)) {
+        try {
+          const parsed = parseConceptDescription(cdEntry)
+          const id = asString(parsed.json.id).trim()
+          if (id !== '') {
+            cdById.set(id, parsed)
+          }
+        } catch (e) {
+          warnings.push(`Skipped CD: ${stringifyUnknown(e)}`)
+        }
+      }
+    }
+  } finally {
+    pkg.Close()
+  }
+
+  return { cdById, warnings }
+}
+
 export function useAASXImport (): {
   importAasxFileClient: (file: File) => Promise<ClientAASXImportResult>
   importEnvironmentFileClient: (file: File) => Promise<ClientAASXImportResult>
@@ -377,40 +453,8 @@ export function useAASXImport (): {
   const { postConceptDescription, putConceptDescription } = useCDRepositoryClient()
   const { determineContentType } = useSMEFile()
 
-  function parseEnvironmentText (environmentText: string, sourceLabel: string): JsonRecord {
-    const trimmedText = environmentText.trim()
-    if (trimmedText === '') {
-      throw new Error(`Environment content in '${sourceLabel}' is empty.`)
-    }
-
-    try {
-      const parsedJson = JSON.parse(trimmedText)
-      const environment = asRecord(parsedJson)
-      if (!environment) {
-        throw new Error(`Environment payload in '${sourceLabel}' is not an object.`)
-      }
-
-      return environment
-    } catch {
-      try {
-        const xmlEnvironment = deserializeXml(trimmedText)
-        const environment = aasCore.jsonization.toJsonable(xmlEnvironment as unknown as aasCore.types.Class)
-        const environmentRecord = asRecord(environment)
-        if (!environmentRecord) {
-          throw new Error(`Environment XML payload in '${sourceLabel}' is invalid.`)
-        }
-
-        return environmentRecord
-      } catch (xmlError) {
-        throw new Error(
-          `Failed to parse environment in '${sourceLabel}' as JSON or XML: ${stringifyUnknown(xmlError)}`,
-          {
-            cause: xmlError,
-          },
-        )
-      }
-    }
-  }
+  // parseEnvironmentText is defined at module scope so it can be shared
+  // with the standalone extractCdsFromAasx export.
 
   function collectEnvironmentEntries (
     environment: JsonRecord,
