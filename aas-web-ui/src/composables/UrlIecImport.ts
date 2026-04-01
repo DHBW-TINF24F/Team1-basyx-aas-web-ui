@@ -1,6 +1,8 @@
 import { load as parseYaml } from 'js-yaml';
+import type { IecCddValidationResult } from '@/types/IecCdd';
+import { useIecCddValidator } from '@/composables/IecCddValidator';
 
-export type DatasetFormat = 'json' | 'xml' | 'csv' | 'yaml' | 'text';
+export type DatasetFormat = 'json' | 'xml' | 'csv' | 'yaml' | 'html' | 'xlsx' | 'text';
 
 export interface UrlImportPayload {
     metadata: {
@@ -10,6 +12,7 @@ export interface UrlImportPayload {
         importedAt: string;
     };
     payload: unknown;
+    validation: IecCddValidationResult;
 }
 
 export interface UrlImportResult {
@@ -19,6 +22,54 @@ export interface UrlImportResult {
 }
 
 export function useUrlIecImport() {
+    const { validateAndExtractIecCddData } = useIecCddValidator();
+
+    async function importFileContent(file: File): Promise<UrlImportResult> {
+        try {
+            const fileName = file.name.toLowerCase();
+            let detectedFormat: DatasetFormat = 'text';
+            let convertedPayload: unknown;
+
+            if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                detectedFormat = 'xlsx';
+                const arrayBuffer = await file.arrayBuffer();
+                convertedPayload = await parseXlsxToJson(arrayBuffer);
+            } else {
+                const rawText = await file.text();
+                if (fileName.endsWith('.xml')) detectedFormat = 'xml';
+                else if (fileName.endsWith('.json')) detectedFormat = 'json';
+                else if (fileName.endsWith('.csv')) detectedFormat = 'csv';
+                else if (fileName.endsWith('.yaml') || fileName.endsWith('.yml')) detectedFormat = 'yaml';
+                else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) detectedFormat = 'html';
+                else detectedFormat = detectDatasetFormat('', fileName, rawText);
+
+                convertedPayload = convertRawPayload(detectedFormat, rawText);
+            }
+
+            const validation = validateAndExtractIecCddData(convertedPayload, detectedFormat);
+
+            return {
+                success: true,
+                data: {
+                    metadata: {
+                        sourceUrl: `file://${file.name}`,
+                        contentType: file.type || '',
+                        detectedFormat,
+                        importedAt: new Date().toISOString(),
+                    },
+                    payload: convertedPayload,
+                    validation,
+                },
+            };
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            return {
+                success: false,
+                error: `Could not read file. ${errorMessage}`,
+            };
+        }
+    }
+
     async function fetchAndConvertUrlContentToJson(url: string): Promise<UrlImportResult> {
         const sanitizedUrl = url.trim();
         if (sanitizedUrl === '') {
@@ -32,14 +83,24 @@ export function useUrlIecImport() {
         }
 
         try {
-            const response = await fetch(sanitizedUrl, {
+            const fetchUrl = isCddIecUrl(sanitizedUrl)
+                ? rewriteCddUrlForProxy(sanitizedUrl)
+                : sanitizedUrl;
+
+            const response = await fetch(fetchUrl, {
                 method: 'GET',
                 headers: {
-                    Accept: 'application/json, application/xml, text/xml, text/csv, application/yaml, text/yaml, text/plain',
+                    Accept: 'application/json, application/xml, text/xml, text/csv, application/yaml, text/yaml, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, text/plain',
                 },
             });
 
             if (!response.ok) {
+                if (isCddIecUrl(sanitizedUrl)) {
+                    return {
+                        success: false,
+                        error: `Could not fetch from cdd.iec.ch (HTTP ${response.status}). The IEC CDD server blocks direct browser requests (CORS). Please save the webpage as HTML and use "Upload Local File" to import it.`,
+                    };
+                }
                 return {
                     success: false,
                     error: `Request failed with status ${response.status}.`,
@@ -47,9 +108,39 @@ export function useUrlIecImport() {
             }
 
             const contentType = response.headers.get('Content-Type')?.split(';')[0]?.toLowerCase() || '';
+
+            const earlyFormat = detectFormatFromContentTypeAndUrl(contentType, sanitizedUrl);
+            if (earlyFormat === 'xlsx') {
+                const arrayBuffer = await response.arrayBuffer();
+                const convertedPayload = await parseXlsxToJson(arrayBuffer);
+                const validation = validateAndExtractIecCddData(convertedPayload, 'xlsx');
+                return {
+                    success: true,
+                    data: {
+                        metadata: {
+                            sourceUrl: sanitizedUrl,
+                            contentType,
+                            detectedFormat: 'xlsx',
+                            importedAt: new Date().toISOString(),
+                        },
+                        payload: convertedPayload,
+                        validation,
+                    },
+                };
+            }
+
             const rawText = await response.text();
             const detectedFormat = detectDatasetFormat(contentType, sanitizedUrl, rawText);
+
+            if (detectedFormat === 'html' && !isCddIecUrl(sanitizedUrl)) {
+                return {
+                    success: false,
+                    error: 'The URL returned an HTML page, not IEC-CDD data (JSON, XML, CSV, YAML, or XLSX). If you want to import from cdd.iec.ch, use the exact cdd.iec.ch URL or save the page as HTML and use "Upload Local File".',
+                };
+            }
+
             const convertedPayload = convertRawPayload(detectedFormat, rawText);
+            const validation = validateAndExtractIecCddData(convertedPayload, detectedFormat);
 
             return {
                 success: true,
@@ -61,10 +152,17 @@ export function useUrlIecImport() {
                         importedAt: new Date().toISOString(),
                     },
                     payload: convertedPayload,
+                    validation,
                 },
             };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            if (isCddIecUrl(sanitizedUrl)) {
+                return {
+                    success: false,
+                    error: `Could not fetch from cdd.iec.ch. The server may block browser requests (CORS). Please save the webpage as HTML and use "Upload Local File" to import it. (${errorMessage})`,
+                };
+            }
             return {
                 success: false,
                 error: `Could not fetch URL content. ${errorMessage}. If this URL is external, the server may block browser CORS requests.`,
@@ -74,26 +172,56 @@ export function useUrlIecImport() {
 
     return {
         fetchAndConvertUrlContentToJson,
+        importFileContent,
     };
+}
+
+function isCddIecUrl(url: string): boolean {
+    try {
+        const parsed = new URL(url);
+        return parsed.hostname === 'cdd.iec.ch' || parsed.hostname.endsWith('.cdd.iec.ch');
+    } catch {
+        return false;
+    }
+}
+
+function rewriteCddUrlForProxy(url: string): string {
+    const parsed = new URL(url);
+    return '/api/iec-proxy' + parsed.pathname + parsed.search;
+}
+
+function detectFormatFromContentTypeAndUrl(contentType: string, url: string): DatasetFormat | null {
+    if (contentType.includes('spreadsheetml') || contentType.includes('ms-excel')) return 'xlsx';
+    const lowerUrl = url.toLowerCase();
+    if (lowerUrl.endsWith('.xlsx') || lowerUrl.endsWith('.xls')) return 'xlsx';
+    return null;
 }
 
 function detectDatasetFormat(contentType: string, url: string, rawText: string): DatasetFormat {
     if (contentType.includes('json')) return 'json';
+    if (contentType.includes('html')) return 'html';
     if (contentType.includes('xml')) return 'xml';
     if (contentType.includes('csv')) return 'csv';
     if (contentType.includes('yaml') || contentType.includes('yml')) return 'yaml';
+    if (contentType.includes('spreadsheetml') || contentType.includes('ms-excel')) return 'xlsx';
 
     const lowerUrl = url.toLowerCase();
     if (lowerUrl.endsWith('.json')) return 'json';
+    if (lowerUrl.endsWith('.html') || lowerUrl.endsWith('.htm')) return 'html';
     if (lowerUrl.endsWith('.xml')) return 'xml';
     if (lowerUrl.endsWith('.csv')) return 'csv';
     if (lowerUrl.endsWith('.yaml') || lowerUrl.endsWith('.yml')) return 'yaml';
+    if (lowerUrl.endsWith('.xlsx') || lowerUrl.endsWith('.xls')) return 'xlsx';
 
     const trimmed = rawText.trim();
     if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
         return 'json';
     }
-    if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
+    if (trimmed.startsWith('<')) {
+        const lower = trimmed.substring(0, 200).toLowerCase();
+        if (lower.includes('<!doctype html') || lower.includes('<html')) {
+            return 'html';
+        }
         return 'xml';
     }
     if (trimmed.includes('\n') && trimmed.includes(',')) {
@@ -113,10 +241,21 @@ function convertRawPayload(format: DatasetFormat, rawText: string): unknown {
             return parseCsvToJson(rawText);
         case 'yaml':
             return parseYaml(rawText);
+        case 'html':
+            return { raw: rawText };
         case 'text':
         default:
             return { raw: rawText };
     }
+}
+
+async function parseXlsxToJson(data: ArrayBuffer): Promise<Array<Record<string, string>>> {
+    const { read, utils } = await import('xlsx');
+    const workbook = read(data, { type: 'array' });
+    const firstSheetName = workbook.SheetNames[0];
+    if (!firstSheetName) throw new Error('Excel file contains no sheets.');
+    const sheet = workbook.Sheets[firstSheetName];
+    return utils.sheet_to_json<Record<string, string>>(sheet, { defval: '' });
 }
 
 function parseXmlToJson(xmlString: string): unknown {
