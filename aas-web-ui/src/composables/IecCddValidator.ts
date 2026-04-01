@@ -6,8 +6,8 @@ const IRDI_REGEX = /^\d{4}\/\d+\/\/\/\d+.*#[A-Z0-9]+#\d+$/;
 const ONTOML_ROOT_ELEMENTS = ['catalogue', 'dictionary'];
 const ONTOML_PROPERTY_CONTAINERS = ['contained_properties', 'properties'];
 
-const CSV_IRDI_HEADERS = ['irdi', 'code'];
-const CSV_NAME_HEADERS = ['preferredname', 'preferred_name', 'name'];
+const CSV_IRDI_HEADERS = ['irdi', 'code', 'property_name.en'];
+const CSV_NAME_HEADERS = ['preferredname', 'preferred_name', 'name', 'preferredname.en'];
 
 export function useIecCddValidator() {
     function validateAndExtractIecCddData(
@@ -273,31 +273,49 @@ function findPropertyArray(payload: unknown): unknown[] | null {
 
 function hasIecFields(obj: Record<string, unknown>): boolean {
     const keys = Object.keys(obj).map((k) => k.toLowerCase());
-    const hasIrdi = keys.some((k) => k === 'irdi' || k === 'code');
+    const hasIrdi = keys.some((k) => k === 'irdi' || k === 'code' || k === 'property_name.en');
     const hasName = keys.some(
-        (k) => k === 'preferredname' || k === 'preferred_name' || k === 'name'
+        (k) => k === 'preferredname' || k === 'preferred_name' || k === 'name' || k === 'preferredname.en'
     );
     return hasIrdi && hasName;
 }
 
 function normalizeJsonProperty(obj: Record<string, unknown>): IecCddProperty | null {
-    const irdi = getFieldCaseInsensitive(obj, ['irdi', 'code']);
-    const preferredName = getFieldCaseInsensitive(obj, ['preferredName', 'preferred_name', 'name']);
+    const irdi = getFieldCaseInsensitive(obj, ['irdi', 'code', 'PROPERTY_NAME.en']);
+    const preferredName = getFieldCaseInsensitive(obj, [
+        'preferredName', 'preferred_name', 'name',
+        'PreferredName.EN', 'preferredname.en',
+    ]);
     if (!irdi || !preferredName) return null;
 
     return {
         irdi: String(irdi),
         preferredName: String(preferredName),
-        shortName: stringOrUndefined(getFieldCaseInsensitive(obj, ['shortName', 'short_name'])),
-        definition: stringOrUndefined(getFieldCaseInsensitive(obj, ['definition'])),
-        unit: stringOrUndefined(getFieldCaseInsensitive(obj, ['unit'])),
-        dataType: stringOrUndefined(getFieldCaseInsensitive(obj, ['dataType', 'data_type', 'datatype'])),
-        valueFormat: stringOrUndefined(getFieldCaseInsensitive(obj, ['valueFormat', 'value_format'])),
+        shortName: stringOrUndefined(getFieldCaseInsensitive(obj, [
+            'shortName', 'short_name', 'ShortName.EN', 'shortname.en',
+        ])),
+        definition: stringOrUndefined(getFieldCaseInsensitive(obj, [
+            'definition', 'Definition.EN', 'definition.en',
+        ])),
+        unit: stringOrUndefined(getFieldCaseInsensitive(obj, [
+            'unit', 'PrimaryUnit', 'primaryunit', 'Symbol', 'symbol',
+        ])),
+        dataType: stringOrUndefined(getFieldCaseInsensitive(obj, [
+            'dataType', 'data_type', 'datatype', 'Data_type',
+        ])),
+        valueFormat: stringOrUndefined(getFieldCaseInsensitive(obj, [
+            'valueFormat', 'value_format', 'Format', 'format',
+        ])),
         sourceOfDefinition: stringOrUndefined(
-            getFieldCaseInsensitive(obj, ['sourceOfDefinition', 'source_of_definition'])
+            getFieldCaseInsensitive(obj, [
+                'sourceOfDefinition', 'source_of_definition',
+                'DefinitionSource', 'definitionsource',
+            ])
         ),
         versionNumber: stringOrUndefined(
-            getFieldCaseInsensitive(obj, ['versionNumber', 'version_number'])
+            getFieldCaseInsensitive(obj, [
+                'versionNumber', 'version_number', 'Version', 'version',
+            ])
         ),
     };
 }
@@ -307,12 +325,16 @@ function getFieldCaseInsensitive(
     candidates: string[]
 ): unknown | undefined {
     for (const candidate of candidates) {
-        if (obj[candidate] !== undefined) return obj[candidate];
+        const val = obj[candidate];
+        if (val !== undefined && val !== '') return val;
     }
     const lowerKeys = new Map(Object.keys(obj).map((k) => [k.toLowerCase(), k]));
     for (const candidate of candidates) {
         const matchedKey = lowerKeys.get(candidate.toLowerCase());
-        if (matchedKey && obj[matchedKey] !== undefined) return obj[matchedKey];
+        if (matchedKey) {
+            const val = obj[matchedKey];
+            if (val !== undefined && val !== '') return val;
+        }
     }
     return undefined;
 }

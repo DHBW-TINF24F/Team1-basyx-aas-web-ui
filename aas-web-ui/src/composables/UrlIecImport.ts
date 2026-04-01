@@ -255,7 +255,73 @@ async function parseXlsxToJson(data: ArrayBuffer): Promise<Array<Record<string, 
     const firstSheetName = workbook.SheetNames[0];
     if (!firstSheetName) throw new Error('Excel file contains no sheets.');
     const sheet = workbook.Sheets[firstSheetName];
+
+    const rawRows = utils.sheet_to_json<string[]>(sheet, { header: 1, defval: '' });
+
+    const iecCddResult = parseIecCddExcelFormat(rawRows);
+    if (iecCddResult) return iecCddResult;
+
     return utils.sheet_to_json<Record<string, string>>(sheet, { defval: '' });
+}
+
+const IEC_CDD_HEADER_MARKERS = ['code', 'preferredname', 'definition', 'primaryunit', 'data_type'];
+
+function parseIecCddExcelFormat(rawRows: string[][]): Array<Record<string, string>> | null {
+    let headerRowIndex = -1;
+    let headers: string[] = [];
+
+    for (let i = 0; i < Math.min(rawRows.length, 50); i++) {
+        const row = rawRows[i];
+        if (!row || row.length === 0) continue;
+
+        const firstCell = String(row[0] || '').trim();
+        if (firstCell.startsWith('#') && firstCell.toLowerCase().includes('property_name')) {
+            headers = row.map((c) => String(c).replace(/^#/, '').trim());
+            headerRowIndex = i;
+            break;
+        }
+
+        const nonEmpty = row.filter((c) => String(c).trim() !== '' && String(c).trim() !== '#');
+        const lowerCells = nonEmpty.map((c) => String(c).trim().toLowerCase());
+        const matchCount = IEC_CDD_HEADER_MARKERS.filter((m) =>
+            lowerCells.some((c) => c.includes(m))
+        ).length;
+        if (matchCount >= 2) {
+            headers = row.map((c) => String(c).replace(/^#/, '').trim());
+            headerRowIndex = i;
+            break;
+        }
+    }
+
+    if (headerRowIndex === -1 || headers.length === 0) return null;
+
+    const dataRows: Array<Record<string, string>> = [];
+    for (let i = headerRowIndex + 1; i < rawRows.length; i++) {
+        const row = rawRows[i];
+        if (!row || row.length === 0) continue;
+
+        const nonEmptyCells = row.filter((c: string) => {
+            const val = String(c).trim();
+            return val !== '' && val !== '#';
+        });
+        if (nonEmptyCells.length === 0) continue;
+
+        const firstCell = String(row[0] || '').trim();
+        if (firstCell.startsWith('#') && firstCell !== '#') continue;
+
+        const obj: Record<string, string> = {};
+        let hasData = false;
+        for (let j = 0; j < headers.length; j++) {
+            const header = headers[j];
+            if (!header) continue;
+            const value = String(row[j] ?? '').trim();
+            obj[header] = value;
+            if (value) hasData = true;
+        }
+        if (hasData) dataRows.push(obj);
+    }
+
+    return dataRows.length > 0 ? dataRows : null;
 }
 
 function parseXmlToJson(xmlString: string): unknown {
