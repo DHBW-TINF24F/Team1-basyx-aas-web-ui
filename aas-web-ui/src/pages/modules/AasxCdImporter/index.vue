@@ -64,8 +64,10 @@
                     density="compact"
                     border="start"
                     class="mb-4">
-                    Found <strong>{{ cdRows.length }}</strong> Concept Description(s) in the AASX file:
-                    <v-chip color="success" size="small" class="ml-2">{{ newCount }} NEW</v-chip>
+                    Found <strong>{{ cdRows.length }}</strong> importable Concept Description(s):
+                    <v-chip color="primary" size="small" class="ml-2">{{ cdCount }} from CD section</v-chip>
+                    <v-chip color="secondary" size="small" class="ml-1">{{ edsCount }} from Submodel EDS</v-chip>
+                    <v-chip color="success" size="small" class="ml-1">{{ newCount }} NEW</v-chip>
                     <v-chip color="warning" size="small" class="ml-1">{{ existsCount }} ALREADY EXISTS</v-chip>
                 </v-alert>
 
@@ -90,6 +92,15 @@
                         <v-checkbox-btn
                             v-model="item.selected"
                             @click.stop />
+                    </template>
+
+                    <template #[`item.source`]="{ item }">
+                        <v-chip
+                            :color="item.source === 'cd' ? 'primary' : 'secondary'"
+                            size="small"
+                            variant="tonal">
+                            {{ item.source === 'cd' ? 'CD' : 'EDS' }}
+                        </v-chip>
                     </template>
 
                     <template #[`item.status`]="{ item }">
@@ -209,11 +220,13 @@
     // --- Local Types ---
     type JsonRecord = Record<string, unknown>;
     type CdStatus = 'new' | 'exists';
+    type CdSource = 'cd' | 'eds';
     type Phase = 'idle' | 'scanning' | 'ready' | 'importing' | 'done';
     type CdRow = {
         id: string;
         preferredName: string;
         status: CdStatus;
+        source: CdSource;
         selected: boolean;
         core: aasCore.types.ConceptDescription;
         json: JsonRecord;
@@ -233,6 +246,7 @@
     // --- Table Headers ---
     const tableHeaders = [
         { title: '', key: 'selected', sortable: false, width: '48px' },
+        { title: 'Source', key: 'source', sortable: true, width: '100px' },
         { title: 'Status', key: 'status', sortable: true, width: '110px' },
         { title: 'Preferred Name', key: 'preferredName', sortable: true },
         { title: 'ID', key: 'id', sortable: true },
@@ -252,6 +266,10 @@
     const newCount = computed<number>(() => cdRows.value.filter((r) => r.status === 'new').length);
 
     const existsCount = computed<number>(() => cdRows.value.filter((r) => r.status === 'exists').length);
+
+    const cdCount = computed<number>(() => cdRows.value.filter((r) => r.source === 'cd').length);
+
+    const edsCount = computed<number>(() => cdRows.value.filter((r) => r.source === 'eds').length);
 
     const allSelected = computed<boolean>(
         () => cdRows.value.length > 0 && cdRows.value.every((r) => r.selected)
@@ -312,11 +330,12 @@
                 );
             }
 
-            // Step 3: Build table rows with status
-            cdRows.value = Array.from(cdById.entries()).map(([id, { core, json }]) => ({
+            // Step 3: Build table rows with status and source
+            cdRows.value = Array.from(cdById.entries()).map(([id, { core, json, source }]) => ({
                 id,
                 preferredName: extractPreferredName(json),
                 status: existingIds.has(id) ? 'exists' : 'new',
+                source,
                 selected: true,
                 core,
                 json,

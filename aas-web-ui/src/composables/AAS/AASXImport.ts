@@ -404,13 +404,75 @@ function parseEnvironmentText (environmentText: string, sourceLabel: string): Js
 }
 
 export type ExtractCdsResult = {
-  cdById: Map<string, { core: aasCore.types.ConceptDescription, json: JsonRecord }>
+  cdById: Map<string, { core: aasCore.types.ConceptDescription, json: JsonRecord, source: 'cd' | 'eds' }>
   warnings: string[]
+}
+
+const IEC_IRI = 'https://admin-shell.io/DataSpecificationTemplates/DataSpecificationIEC61360/3/0'
+
+function collectEdsAsCds (
+  node: unknown,
+  result: Map<string, { core: aasCore.types.ConceptDescription, json: JsonRecord, source: 'eds' }>,
+  warnings: string[],
+  visited = new WeakSet<object>(),
+): void {
+  if (!node || typeof node !== 'object') {
+    return
+  }
+  if (visited.has(node as object)) {
+    return
+  }
+  visited.add(node as object)
+
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      collectEdsAsCds(item, result, warnings, visited)
+    }
+    return
+  }
+
+  const record = asRecord(node)
+  if (!record) {
+    return
+  }
+
+  const eds = asArray(record.embeddedDataSpecifications)
+  if (eds.length > 0) {
+    const semanticId = asRecord(record.semanticId)
+    const keys = semanticId ? asArray(semanticId.keys) : []
+    const idCandidate = keys.length > 0 ? asString(asRecord(keys[0])?.value ?? '').trim() : ''
+
+    if (idCandidate !== '') {
+      const iec360Eds = eds.filter((e) => {
+        const spec = asRecord(asRecord(e)?.dataSpecification)
+        const specKeys = spec ? asArray(spec.keys) : []
+        return specKeys.some((k) => asString(asRecord(k)?.value ?? '') === IEC_IRI)
+      })
+
+      if (iec360Eds.length > 0 && !result.has(idCandidate)) {
+        const cdJson: JsonRecord = {
+          modelType: 'ConceptDescription',
+          id: idCandidate,
+          embeddedDataSpecifications: iec360Eds,
+        }
+        try {
+          const parsed = parseConceptDescription(cdJson)
+          result.set(idCandidate, { core: parsed.core, json: parsed.json, source: 'eds' })
+        } catch (e) {
+          warnings.push(`Skipped EDS from element '${idCandidate}': ${stringifyUnknown(e)}`)
+        }
+      }
+    }
+  }
+
+  for (const value of Object.values(record)) {
+    collectEdsAsCds(value, result, warnings, visited)
+  }
 }
 
 export async function extractCdsFromAasx (file: File): Promise<ExtractCdsResult> {
   const warnings: string[] = []
-  const cdById = new Map<string, { core: aasCore.types.ConceptDescription, json: JsonRecord }>()
+  const cdById = new Map<string, { core: aasCore.types.ConceptDescription, json: JsonRecord, source: 'cd' | 'eds' }>()
 
   const bytes = new Uint8Array(await file.arrayBuffer())
   const packaging = NewPackaging()
@@ -430,11 +492,25 @@ export async function extractCdsFromAasx (file: File): Promise<ExtractCdsResult>
           const parsed = parseConceptDescription(cdEntry)
           const id = asString(parsed.json.id).trim()
           if (id !== '') {
-            cdById.set(id, parsed)
+            cdById.set(id, { ...parsed, source: 'cd' })
           }
         } catch (e) {
           warnings.push(`Skipped CD: ${stringifyUnknown(e)}`)
         }
+      }
+    }
+
+    const edsMap = new Map<string, { core: aasCore.types.ConceptDescription, json: JsonRecord, source: 'eds' }>()
+    for (const spec of specs) {
+      const environment = parseEnvironmentText(spec.ReadAllText(), `${file.name}:${spec.URI.pathname}`)
+      for (const smEntry of asArray(environment.submodels)) {
+        collectEdsAsCds(smEntry, edsMap, warnings)
+      }
+    }
+
+    for (const [id, entry] of edsMap) {
+      if (!cdById.has(id)) {
+        cdById.set(id, entry)
       }
     }
   } finally {
