@@ -112,6 +112,18 @@
                         </v-chip>
                     </template>
 
+                    <template #[`item.diff`]="{ item }">
+                        <v-btn
+                            v-if="item.status === 'exists'"
+                            size="x-small"
+                            variant="tonal"
+                            color="warning"
+                            prepend-icon="mdi-compare"
+                            @click.stop="openDiffDialog(item)">
+                            View Diff
+                        </v-btn>
+                    </template>
+
                     <template #[`item.preferredName`]="{ item }">
                         <span v-if="item.preferredName" class="text-body-2">{{ item.preferredName }}</span>
                         <span v-else class="text-medium-emphasis text-caption font-italic">—</span>
@@ -196,6 +208,72 @@
                 </v-card-actions>
             </v-sheet>
         </v-dialog>
+
+        <!-- Diff Dialog -->
+        <v-dialog v-model="diffDialogOpen" width="800">
+            <v-sheet border rounded="lg">
+                <v-card-title class="bg-cardHeader">
+                    <v-icon icon="mdi-compare" class="mr-2" />
+                    Compare Concept Descriptions
+                </v-card-title>
+                <v-divider />
+                <v-card-text>
+                    <p class="text-caption text-medium-emphasis mb-3">
+                        <strong>ID:</strong> {{ diffRow?.id }}
+                    </p>
+                    <template v-if="diffRow">
+                        <v-alert
+                            v-if="computeCdDiff(diffRow.json, diffRow.existingJson!).length === 0"
+                            type="success"
+                            density="compact"
+                            class="mb-3">
+                            No differences found. The incoming CD is identical to the existing one.
+                        </v-alert>
+
+                        <v-table v-else density="compact" class="border rounded mb-3">
+                            <thead>
+                                <tr>
+                                    <th style="width:160px">Field</th>
+                                    <th>
+                                        <v-chip color="primary" size="x-small" class="mr-1">Incoming</v-chip>
+                                        from AASX
+                                    </th>
+                                    <th>
+                                        <v-chip color="warning" size="x-small" class="mr-1">Existing</v-chip>
+                                        in Repository
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr
+                                    v-for="diff in computeCdDiff(diffRow.json, diffRow.existingJson!)"
+                                    :key="diff.field">
+                                    <td class="text-caption font-weight-bold">{{ diff.field }}</td>
+                                    <td class="text-caption text-success">
+                                        <pre style="white-space: pre-wrap; word-break: break-all">{{ diff.incoming }}</pre>
+                                    </td>
+                                    <td class="text-caption text-warning">
+                                        <pre style="white-space: pre-wrap; word-break: break-all">{{ diff.existing }}</pre>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </v-table>
+
+                        <v-alert type="info" density="compact">
+                            The row is currently
+                            <strong>{{ diffRow.selected ? 'selected' : 'deselected' }}</strong> —
+                            {{ diffRow.selected ? 'importing will overwrite the existing CD with the incoming version.' : 'the existing version will be kept.' }}
+                            Toggle the checkbox in the table to change your selection.
+                        </v-alert>
+                    </template>
+                </v-card-text>
+                <v-divider />
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn rounded="lg" @click="diffDialogOpen = false">Close</v-btn>
+                </v-card-actions>
+            </v-sheet>
+        </v-dialog>
     </v-container>
 </template>
 
@@ -230,8 +308,10 @@
         selected: boolean;
         core: aasCore.types.ConceptDescription;
         json: JsonRecord;
+        existingJson: JsonRecord | null;
     };
     type ImportSummary = { succeeded: number; failed: number; total: number };
+    type DiffEntry = { field: string; incoming: string; existing: string };
 
     // --- Reactive State ---
     const aasxFiles = ref<File[]>([]);
@@ -240,6 +320,8 @@
     const parseError = ref<string>('');
     const cdRows = ref<CdRow[]>([]);
     const confirmDialogOpen = ref<boolean>(false);
+    const diffDialogOpen = ref<boolean>(false);
+    const diffRow = ref<CdRow | null>(null);
     const importSummary = ref<ImportSummary | null>(null);
     const importErrors = ref<string[]>([]);
 
@@ -248,6 +330,7 @@
         { title: '', key: 'selected', sortable: false, width: '48px' },
         { title: 'Source', key: 'source', sortable: true, width: '100px' },
         { title: 'Status', key: 'status', sortable: true, width: '110px' },
+        { title: '', key: 'diff', sortable: false, width: '110px' },
         { title: 'Preferred Name', key: 'preferredName', sortable: true },
         { title: 'ID', key: 'id', sortable: true },
     ];
@@ -295,6 +378,51 @@
         }
     }
 
+    function computeCdDiff(incoming: JsonRecord, existing: JsonRecord): DiffEntry[] {
+        const diffs: DiffEntry[] = [];
+
+        const stringify = (v: unknown): string => {
+            if (v === undefined || v === null) return '—';
+            if (typeof v === 'string') return v;
+            return JSON.stringify(v, null, 2);
+        };
+
+        for (const field of ['id', 'category', 'idShort']) {
+            const a = stringify(incoming[field]);
+            const b = stringify(existing[field]);
+            if (a !== b) diffs.push({ field, incoming: a, existing: b });
+        }
+
+        for (const field of ['displayName', 'description']) {
+            const a = stringify(incoming[field]);
+            const b = stringify(existing[field]);
+            if (a !== b) diffs.push({ field, incoming: a, existing: b });
+        }
+
+        const getContent = (json: JsonRecord): JsonRecord | null => {
+            const eds = Array.isArray(json.embeddedDataSpecifications) ? json.embeddedDataSpecifications : [];
+            if (eds.length === 0) return null;
+            return (eds[0] as any)?.dataSpecificationContent ?? null;
+        };
+
+        const inContent = getContent(incoming);
+        const exContent = getContent(existing);
+
+        for (const field of ['dataType', 'unit', 'symbol', 'sourceOfDefinition', 'valueFormat']) {
+            const a = stringify(inContent?.[field]);
+            const b = stringify(exContent?.[field]);
+            if (a !== b) diffs.push({ field: `EDS.${field}`, incoming: a, existing: b });
+        }
+
+        for (const field of ['preferredName', 'shortName', 'definition']) {
+            const a = stringify(inContent?.[field]);
+            const b = stringify(exContent?.[field]);
+            if (a !== b) diffs.push({ field: `EDS.${field}`, incoming: a, existing: b });
+        }
+
+        return diffs;
+    }
+
     // --- Core Functions ---
     async function scanFile(): Promise<void> {
         if (!selectedFile.value) return;
@@ -318,27 +446,29 @@
             }
 
             // Step 2: Fetch existing CDs from the repository
-            let existingIds = new Set<string>();
+            const existingById = new Map<string, JsonRecord>();
             try {
                 const existingCds: any[] = await fetchCdList();
-                existingIds = new Set<string>(
-                    existingCds.map((cd) => String(cd?.id ?? '')).filter((id) => id !== '')
-                );
+                for (const cd of existingCds) {
+                    const id = String(cd?.id ?? '').trim();
+                    if (id !== '') existingById.set(id, cd as JsonRecord);
+                }
             } catch {
                 parseWarnings.value.push(
                     'Could not fetch existing CDs from repository — all extracted CDs will be treated as NEW.'
                 );
             }
 
-            // Step 3: Build table rows with status and source
+            // Step 3: Build table rows with status, source and existing data
             cdRows.value = Array.from(cdById.entries()).map(([id, { core, json, source }]) => ({
                 id,
                 preferredName: extractPreferredName(json),
-                status: existingIds.has(id) ? 'exists' : 'new',
+                status: existingById.has(id) ? 'exists' : 'new',
                 source,
                 selected: true,
                 core,
                 json,
+                existingJson: existingById.get(id) ?? null,
             }));
 
             phase.value = 'ready';
@@ -355,6 +485,11 @@
                 extendedError: parseError.value,
             });
         }
+    }
+
+    function openDiffDialog(row: CdRow): void {
+        diffRow.value = row;
+        diffDialogOpen.value = true;
     }
 
     function confirmImport(): void {
@@ -429,6 +564,8 @@
         parseError.value = '';
         importSummary.value = null;
         importErrors.value = [];
+        diffDialogOpen.value = false;
+        diffRow.value = null;
     }
 
     // --- Watchers ---
@@ -440,6 +577,8 @@
             parseError.value = '';
             importSummary.value = null;
             importErrors.value = [];
+            diffDialogOpen.value = false;
+            diffRow.value = null;
         }
     });
 </script>
