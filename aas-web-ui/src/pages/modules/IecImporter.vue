@@ -2,61 +2,38 @@
     <v-container max-width="1200">
         <v-card>
             <v-card-title align="center">IEC Importer</v-card-title>
+            <v-card-subtitle class="text-center pb-2">Import von lokalen HTML- oder Excel-Dateien</v-card-subtitle>
             <v-divider />
             <v-card-text>
-                <!-- URL Input -->
-                <v-text-field
-                    id="iec-url-input"
-                    v-model="iecDatasetUrl"
-                    density="compact"
-                    variant="outlined"
-                    label="IEC dataset URL (JSON, XML, CSV, YAML, XLSX)"
-                    prepend-inner-icon="mdi-link-variant"
-                    :error="iecDatasetUrl.trim().length > 0 && !isValidDatasetUrl"
-                    class="mb-2">
-                </v-text-field>
-
-                <v-row class="mb-2">
-                    <v-col cols="12" md="4">
-                        <v-btn variant="tonal" block color="info" @click="useSampleDatasetUrl">Use Sample URL</v-btn>
-                    </v-col>
-                    <v-col cols="12" md="4">
-                        <v-btn
-                            variant="flat"
-                            block
-                            color="secondary"
-                            :loading="datasetLoading"
-                            :disabled="!isValidDatasetUrl"
-                            @click="importDatasetFromUrl"
-                            >Fetch URL and Convert to JSON</v-btn
-                        >
-                    </v-col>
-                    <v-col cols="12" md="4">
-                        <v-btn
-                            variant="tonal"
-                            block
-                            color="primary"
-                            prepend-icon="mdi-file-upload"
-                            @click="triggerFileInput"
-                            >Upload Local File</v-btn
-                        >
-                        <input
-                            ref="fileInputRef"
-                            type="file"
-                            accept=".xml,.json,.csv,.yaml,.yml,.xlsx,.xls,.html,.htm"
-                            style="display: none"
-                            @change="handleFileUpload" />
-                    </v-col>
-                </v-row>
+                <!-- File Upload Button -->
+                <v-btn
+                    variant="flat"
+                    block
+                    color="primary"
+                    size="large"
+                    prepend-icon="mdi-file-upload"
+                    class="mb-3"
+                    :loading="datasetLoading"
+                    @click="triggerFileInput"
+                    >Datei hochladen</v-btn
+                >
+                <input
+                    ref="fileInputRef"
+                    type="file"
+                    accept=".xml,.json,.csv,.yaml,.yml,.xlsx,.xls,.html,.htm"
+                    style="display: none"
+                    @change="handleFileUpload" />
 
                 <!-- Info Alerts -->
                 <v-alert density="compact" class="mb-3" type="info" variant="tonal">
-                    For cdd.iec.ch URLs: In development mode, requests are proxied automatically. In production, save the
-                    webpage as HTML and use "Upload Local File". Other external URLs must allow browser CORS requests.
+                    Der IEC Importer unterstuetzt ausschliesslich den Import ueber Datei-Upload. Speichern Sie
+                    IEC-CDD-Seiten als HTML oder laden Sie Datensaetze als Excel-Datei herunter und laden Sie diese hier
+                    hoch.
                 </v-alert>
 
                 <v-alert density="compact" class="mb-3" type="info" variant="tonal">
-                    Supported formats: JSON, XML, CSV, YAML, XLSX/XLS, and HTML (saved cdd.iec.ch pages).
+                    Unterstuetzte Formate: HTML (gespeicherte cdd.iec.ch-Seiten), XLSX/XLS (Excel), sowie JSON, XML,
+                    CSV und YAML.
                 </v-alert>
 
                 <!-- Format Detection -->
@@ -161,9 +138,9 @@
 </template>
 
 <script setup lang="ts">
-    import { computed, ref } from 'vue';
+    import { ref } from 'vue';
     import type { IecCddValidationResult } from '@/types/IecCdd';
-    import { useUrlIecImport } from '@/composables/UrlIecImport';
+    import { useIecFileImport } from '@/composables/IecFileImport';
     import { useNavigationStore } from '@/store/NavigationStore';
 
     defineOptions({
@@ -171,9 +148,8 @@
     });
 
     const navigationStore = useNavigationStore();
-    const { fetchAndConvertUrlContentToJson, importFileContent } = useUrlIecImport();
+    const { importFileContent } = useIecFileImport();
 
-    const iecDatasetUrl = ref<string>('');
     const datasetLoading = ref<boolean>(false);
     const importedDatasetJsonPreview = ref<string>('');
     const importedDatasetFormat = ref<string>('');
@@ -189,22 +165,6 @@
         { title: 'Unit', key: 'unit', sortable: true },
         { title: 'Data Type', key: 'dataType', sortable: true },
     ];
-
-    const isValidDatasetUrl = computed(() => {
-        const value = iecDatasetUrl.value.trim();
-        if (value === '') return false;
-        try {
-            const parsedUrl = new URL(value);
-            return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
-        } catch {
-            return false;
-        }
-    });
-
-    function useSampleDatasetUrl(): void {
-        const samplePath = `${import.meta.env.BASE_URL}config/sample-iec-dataset.xml`;
-        iecDatasetUrl.value = new URL(samplePath, window.location.origin).toString();
-    }
 
     function triggerFileInput(): void {
         fileInputRef.value?.click();
@@ -222,36 +182,6 @@
         } finally {
             datasetLoading.value = false;
             input.value = '';
-        }
-    }
-
-    async function importDatasetFromUrl(): Promise<void> {
-        if (!isValidDatasetUrl.value) {
-            navigationStore.dispatchSnackbar({
-                status: true,
-                timeout: 5000,
-                color: 'error',
-                btnColor: 'buttonText',
-                text: 'Please provide a valid dataset URL.',
-            });
-            return;
-        }
-
-        datasetLoading.value = true;
-        try {
-            const result = await fetchAndConvertUrlContentToJson(iecDatasetUrl.value);
-            handleImportResult(result, 'Dataset imported from URL');
-        } catch (error) {
-            navigationStore.dispatchSnackbar({
-                status: true,
-                timeout: 8000,
-                color: 'error',
-                btnColor: 'buttonText',
-                text: 'URL import failed',
-                extendedError: error instanceof Error ? error.message : 'Unknown error occurred',
-            });
-        } finally {
-            datasetLoading.value = false;
         }
     }
 

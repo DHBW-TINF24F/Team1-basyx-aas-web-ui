@@ -1,20 +1,17 @@
 # IEC Importer - Erklaerung fuer den Vorgesetzten
 
 ## Ziel
-Verstehen, wie ein IEC-Datensatz aus einer URL eingelesen und in JSON umgewandelt wird, damit die Daten einheitlich angezeigt, geprueft und weiterverarbeitet werden koennen.
+Verstehen, wie ein IEC-Datensatz aus einer lokalen Datei eingelesen und in JSON umgewandelt wird, damit die Daten einheitlich angezeigt, geprueft und weiterverarbeitet werden koennen.
 
 ## Kurzfassung
-Der IEC Importer ist ein eigenes Modul. Es laedt Datensaetze von einer URL per HTTP GET, erkennt das Datenformat (JSON, XML, CSV, YAML oder Text), konvertiert alles in ein einheitliches JSON und zeigt das Ergebnis als Vorschau an. Das Ergebnis kann ausserdem als JSON heruntergeladen werden.
+Der IEC Importer ist ein eigenes Modul. Er importiert Datensaetze aus lokalen Dateien (HTML oder Excel), erkennt das Datenformat automatisch, konvertiert alles in ein einheitliches JSON und zeigt das Ergebnis als Vorschau an. Das Ergebnis kann ausserdem als JSON oder CSV heruntergeladen werden.
 
-## Aufgabe 1: Inhalte von URLs anfordern
-1. Der Benutzer gibt eine URL ein.
-2. Die Anwendung prueft, ob die URL gueltig ist (http/https).
-3. Die Anwendung sendet eine HTTP GET Anfrage (fetch) mit einem Accept-Header fuer mehrere Formate.
-4. Die Antwort wird auf Erfolg geprueft (HTTP 2xx) und der Content-Type wird gelesen.
-5. Bei Fehlern wird eine klare Rueckmeldung in der UI angezeigt.
+**Hinweis:** Der Import ueber URLs wird nicht unterstuetzt. IEC-CDD-Seiten (cdd.iec.ch) muessen als HTML gespeichert und dann als Datei hochgeladen werden.
 
-### Wichtiger technischer Hinweis
-Bei externen URLs muss der Zielserver CORS erlauben. Wenn CORS nicht erlaubt ist, blockiert der Browser die Anfrage.
+## Aufgabe 1: Datei hochladen und einlesen
+1. Der Benutzer klickt auf "Datei hochladen" und waehlt eine lokale Datei aus.
+2. Unterstuetzte Formate: HTML (gespeicherte cdd.iec.ch-Seiten), XLSX/XLS (Excel), JSON, XML, CSV, YAML.
+3. Die Datei wird lokal im Browser gelesen — es werden keine Netzwerkanfragen gestellt.
 
 ## Aufgabe 2: Inhalte lesen und in JSON umwandeln
 Nach dem Laden wird das Format bestimmt und passend konvertiert:
@@ -23,29 +20,33 @@ Nach dem Laden wird das Format bestimmt und passend konvertiert:
 - XML: ueber DOMParser in Objektstruktur
 - CSV: Zeilen/Spalten in Array von Objekten
 - YAML: ueber YAML-Parser in Objekt
-- Text: als Rohtext in ein JSON-Feld
+- HTML: Rohtext mit Tabellenextraktion
+- XLSX/XLS: ueber xlsx-Bibliothek mit IEC-CDD-Formaterkennung
 
 Das Ergebnis ist immer einheitlich aufgebaut:
 
-- metadata: Quelle, Content-Type, erkanntes Format, Zeitpunkt
+- metadata: Quelldatei, Content-Type, erkanntes Format, Zeitpunkt
 - payload: konvertierte Daten
+- validation: IEC-CDD-Validierungsergebnis mit extrahierten Properties
 
 ## Was genau umgesetzt wurde
 1. Eigenes IEC-Modul erstellt (getrennt vom AAS Importer):
    - src/pages/modules/IecImporter.vue
 2. Wiederverwendbare TypeScript-Konvertierungslogik erstellt:
-   - src/composables/UrlIecImport.ts
-3. Demo-Datensatz fuer die Vorfuehrung hinterlegt:
+   - src/composables/IecFileImport.ts
+3. Demo-Datensatz fuer Testzwecke hinterlegt:
    - public/config/sample-iec-dataset.xml
-4. Tests fuer JSON/XML/CSV-Konvertierung erstellt:
-   - tests/composables/UrlIecImport.test.ts
+4. Tests fuer Validierung und HTML-Parsing erstellt:
+   - tests/composables/IecCddValidator.test.ts
+   - tests/composables/IecCddHtmlParser.test.ts
 5. IEC-Teil aus AAS Importer entfernt, damit klare Modultrennung besteht.
 
 ## Nutzen fuer das Projekt
 - Einheitliches JSON reduziert Integrationsaufwand in weiteren Schritten.
-- Unterschiedliche Datenquellen koennen gleich verarbeitet werden.
+- Unterschiedliche Dateiformate koennen gleich verarbeitet werden.
 - Saubere Trennung in ein eigenes Modul verbessert Wartbarkeit und Nachvollziehbarkeit.
+- Kein Netzwerkzugriff noetig — funktioniert zuverlaessig ohne CORS-Probleme.
 - Tests erhoehen Zuverlaessigkeit.
 
 ## Vorschlag fuer einen kurzen Sprechtext (Meeting)
-Ich habe einen eigenstaendigen IEC Importer umgesetzt. Das Modul laedt Datensaetze aus einer URL, erkennt automatisch das Quellformat und konvertiert den Inhalt in ein einheitliches JSON-Format. Dadurch koennen wir unterschiedliche IEC-Datenquellen konsistent anzeigen und weiterverarbeiten. Die Funktion ist vom AAS Importer getrennt und durch Tests abgesichert.
+Ich habe den IEC Importer ueberarbeitet. Das Modul importiert Datensaetze ausschliesslich ueber Datei-Upload (HTML oder Excel), erkennt automatisch das Quellformat und konvertiert den Inhalt in ein einheitliches JSON-Format. Der URL-Import wurde entfernt, da er wegen CORS-Einschraenkungen nicht zuverlaessig funktioniert hat. Dadurch koennen wir IEC-Daten jetzt stabil und ohne Netzwerkabhaengigkeit importieren.
