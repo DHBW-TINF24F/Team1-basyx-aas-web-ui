@@ -15,5 +15,5 @@ export interface IecCddValidationResult {
     properties: IecCddProperty[];
     warnings: string[];
     errors: string[];
-    detectedSchema: 'ontoml-xml' | 'iec-json' | 'iec-csv' | 'iec-html' | 'iec-xlsx' | 'unknown';
+    detectedSchema: 'ontoml-xml' | 'iec-json' | 'iec-csv' | 'iec-xlsx' | 'unknown';
 }

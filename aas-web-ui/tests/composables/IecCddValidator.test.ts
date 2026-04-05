@@ -239,44 +239,6 @@ describe('IecCddValidator.ts; CSV validation', () => {
     });
 });
 
-describe('IecCddValidator.ts; HTML validation', () => {
-    it('should extract properties from valid IEC-CDD HTML with table', () => {
-        const html = `<!DOCTYPE html><html><body>
-            <table>
-                <tr><td>IRDI</td><td>0112/2///61360_4#AAE530#002</td></tr>
-                <tr><td>Preferred Name</td><td>operating temperature</td></tr>
-                <tr><td>Short Name</td><td>T_op</td></tr>
-                <tr><td>Definition</td><td>temperature range in which the device can be operated</td></tr>
-                <tr><td>Unit</td><td>degree Celsius</td></tr>
-                <tr><td>Data Type</td><td>REAL_MEASURE_TYPE</td></tr>
-            </table>
-        </body></html>`;
-
-        const result = validateAndExtractIecCddData({ raw: html }, 'html');
-        expect(result.isValid).toBe(true);
-        expect(result.detectedSchema).toBe('iec-html');
-        expect(result.properties).toHaveLength(1);
-        expect(result.properties[0].irdi).toBe('0112/2///61360_4#AAE530#002');
-        expect(result.properties[0].preferredName).toBe('operating temperature');
-        expect(result.properties[0].unit).toBe('degree Celsius');
-        expect(result.properties[0].dataType).toBe('REAL_MEASURE_TYPE');
-    });
-
-    it('should reject non-IEC HTML', () => {
-        const html = `<!DOCTYPE html><html><body><h1>Hello World</h1><p>This is not IEC data.</p></body></html>`;
-
-        const result = validateAndExtractIecCddData({ raw: html }, 'html');
-        expect(result.isValid).toBe(false);
-        expect(result.detectedSchema).toBe('unknown');
-        expect(result.errors.length).toBeGreaterThan(0);
-    });
-
-    it('should reject empty HTML', () => {
-        const result = validateAndExtractIecCddData({ raw: '' }, 'html');
-        expect(result.isValid).toBe(false);
-    });
-});
-
 describe('IecCddValidator.ts; XLSX validation', () => {
     it('should validate XLSX data (same format as CSV) and set correct schema', () => {
         const payload = [

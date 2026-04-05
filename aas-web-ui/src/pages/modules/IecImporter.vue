@@ -2,7 +2,7 @@
     <v-container max-width="1200">
         <v-card>
             <v-card-title align="center">IEC Importer</v-card-title>
-            <v-card-subtitle class="text-center pb-2">Import von lokalen HTML- oder Excel-Dateien</v-card-subtitle>
+            <v-card-subtitle class="text-center pb-2">Import von lokalen Excel-Dateien</v-card-subtitle>
             <v-divider />
             <v-card-text>
                 <!-- File Upload Button -->
@@ -20,20 +20,18 @@
                 <input
                     ref="fileInputRef"
                     type="file"
-                    accept=".xml,.json,.csv,.yaml,.yml,.xlsx,.xls,.html,.htm"
+                    accept=".xml,.json,.csv,.yaml,.yml,.xlsx,.xls"
                     style="display: none"
                     @change="handleFileUpload" />
 
                 <!-- Info Alerts -->
                 <v-alert density="compact" class="mb-3" type="info" variant="tonal">
-                    Der IEC Importer unterstuetzt ausschliesslich den Import ueber Datei-Upload. Speichern Sie
-                    IEC-CDD-Seiten als HTML oder laden Sie Datensaetze als Excel-Datei herunter und laden Sie diese hier
-                    hoch.
+                    Der IEC Importer unterstuetzt ausschliesslich den Import ueber Datei-Upload. Laden Sie
+                    IEC-CDD-Datensaetze als Excel-Datei herunter und laden Sie diese hier hoch.
                 </v-alert>
 
                 <v-alert density="compact" class="mb-3" type="info" variant="tonal">
-                    Unterstuetzte Formate: HTML (gespeicherte cdd.iec.ch-Seiten), XLSX/XLS (Excel), sowie JSON, XML,
-                    CSV und YAML.
+                    Unterstuetzte Formate: XLSX/XLS (Excel), sowie JSON, XML, CSV und YAML.
                 </v-alert>
 
                 <!-- Format Detection -->
@@ -104,6 +102,30 @@
                     </v-card-text>
                 </v-card>
 
+                <!-- Save to CD Repository -->
+                <v-btn
+                    v-if="validationResult && validationResult.isValid"
+                    variant="flat"
+                    block
+                    color="success"
+                    size="large"
+                    prepend-icon="mdi-content-save"
+                    class="mb-3"
+                    :loading="savingCds"
+                    @click="saveAsConceptDescriptions"
+                    >Als Concept Descriptions speichern</v-btn
+                >
+
+                <!-- Save Result -->
+                <v-alert
+                    v-if="saveResultMessage !== ''"
+                    density="compact"
+                    class="mb-3"
+                    :type="saveResultType"
+                    variant="tonal">
+                    {{ saveResultMessage }}
+                </v-alert>
+
                 <!-- Download Buttons -->
                 <v-row v-if="importedDatasetJsonPreview !== ''" class="mb-3">
                     <v-col cols="12" md="6">
@@ -139,8 +161,9 @@
 
 <script setup lang="ts">
     import { ref } from 'vue';
-    import type { IecCddValidationResult } from '@/types/IecCdd';
+    import type { IecCddProperty, IecCddValidationResult } from '@/types/IecCdd';
     import { useIecFileImport } from '@/composables/IecFileImport';
+    import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
     import { useNavigationStore } from '@/store/NavigationStore';
 
     defineOptions({
@@ -149,13 +172,17 @@
 
     const navigationStore = useNavigationStore();
     const { importFileContent } = useIecFileImport();
+    const { createCd, updateCd, isAvailableByIdInRepo } = useCDRepositoryClient();
 
     const datasetLoading = ref<boolean>(false);
+    const savingCds = ref<boolean>(false);
     const importedDatasetJsonPreview = ref<string>('');
     const importedDatasetFormat = ref<string>('');
     const validationResult = ref<IecCddValidationResult | null>(null);
     const tableSearch = ref<string>('');
     const fileInputRef = ref<HTMLInputElement | null>(null);
+    const saveResultMessage = ref<string>('');
+    const saveResultType = ref<'success' | 'error' | 'info'>('success');
 
     const propertyTableHeaders = [
         { title: 'IRDI', key: 'irdi', sortable: true },
@@ -216,6 +243,86 @@
             btnColor: 'buttonText',
             text: `${successPrefix} (${importedDatasetFormat.value})${validationInfo}`,
         });
+    }
+
+    function buildConceptDescription(property: IecCddProperty): Record<string, unknown> {
+        const preferredName = [{ language: 'en', text: property.preferredName }];
+
+        const shortName = property.shortName ? [{ language: 'en', text: property.shortName }] : null;
+
+        const definition = property.definition ? [{ language: 'en', text: property.definition }] : null;
+
+        const dataSpecificationContent: Record<string, unknown> = {
+            modelType: 'DataSpecificationIec61360',
+            preferredName,
+        };
+        if (shortName) dataSpecificationContent.shortName = shortName;
+        if (property.unit) dataSpecificationContent.unit = property.unit;
+        if (property.sourceOfDefinition) dataSpecificationContent.sourceOfDefinition = property.sourceOfDefinition;
+        if (property.dataType) dataSpecificationContent.dataType = property.dataType;
+        if (definition) dataSpecificationContent.definition = definition;
+        if (property.valueFormat) dataSpecificationContent.valueFormat = property.valueFormat;
+
+        return {
+            modelType: 'ConceptDescription',
+            id: property.irdi,
+            idShort: property.shortName || property.preferredName,
+            embeddedDataSpecifications: [
+                {
+                    dataSpecification: {
+                        type: 'ExternalReference',
+                        keys: [
+                            {
+                                type: 'GlobalReference',
+                                value: 'https://admin-shell.io/DataSpecificationTemplates/DataSpecificationIec61360/3/0',
+                            },
+                        ],
+                    },
+                    dataSpecificationContent,
+                },
+            ],
+        };
+    }
+
+    async function saveAsConceptDescriptions(): Promise<void> {
+        if (!validationResult.value || !validationResult.value.isValid) return;
+
+        savingCds.value = true;
+        saveResultMessage.value = '';
+        let created = 0;
+        let updated = 0;
+        let failed = 0;
+
+        try {
+            for (const property of validationResult.value.properties) {
+                const cd = buildConceptDescription(property);
+                const exists = await isAvailableByIdInRepo(property.irdi);
+
+                let result;
+                if (exists) {
+                    result = await updateCd(property.irdi, cd);
+                    if (result.success) updated++;
+                    else failed++;
+                } else {
+                    result = await createCd(cd);
+                    if (result.success) created++;
+                    else failed++;
+                }
+            }
+
+            if (failed === 0) {
+                saveResultType.value = 'success';
+                saveResultMessage.value = `Erfolgreich gespeichert: ${created} erstellt, ${updated} aktualisiert.`;
+            } else {
+                saveResultType.value = 'error';
+                saveResultMessage.value = `${created} erstellt, ${updated} aktualisiert, ${failed} fehlgeschlagen.`;
+            }
+        } catch (e) {
+            saveResultType.value = 'error';
+            saveResultMessage.value = `Fehler beim Speichern: ${e instanceof Error ? e.message : 'Unbekannter Fehler'}`;
+        } finally {
+            savingCds.value = false;
+        }
     }
 
     function downloadImportedDatasetJson(): void {

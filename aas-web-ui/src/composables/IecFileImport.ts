@@ -2,7 +2,7 @@ import { load as parseYaml } from 'js-yaml';
 import type { IecCddValidationResult } from '@/types/IecCdd';
 import { useIecCddValidator } from '@/composables/IecCddValidator';
 
-export type DatasetFormat = 'json' | 'xml' | 'csv' | 'yaml' | 'html' | 'xlsx' | 'text';
+export type DatasetFormat = 'json' | 'xml' | 'csv' | 'yaml' | 'xlsx' | 'text';
 
 export interface FileImportPayload {
     metadata: {
@@ -40,7 +40,6 @@ export function useIecFileImport() {
                 else if (fileName.endsWith('.json')) detectedFormat = 'json';
                 else if (fileName.endsWith('.csv')) detectedFormat = 'csv';
                 else if (fileName.endsWith('.yaml') || fileName.endsWith('.yml')) detectedFormat = 'yaml';
-                else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) detectedFormat = 'html';
                 else detectedFormat = detectDatasetFormat('', fileName, rawText);
 
                 convertedPayload = convertRawPayload(detectedFormat, rawText);
@@ -77,7 +76,6 @@ export function useIecFileImport() {
 
 function detectDatasetFormat(contentType: string, url: string, rawText: string): DatasetFormat {
     if (contentType.includes('json')) return 'json';
-    if (contentType.includes('html')) return 'html';
     if (contentType.includes('xml')) return 'xml';
     if (contentType.includes('csv')) return 'csv';
     if (contentType.includes('yaml') || contentType.includes('yml')) return 'yaml';
@@ -85,7 +83,6 @@ function detectDatasetFormat(contentType: string, url: string, rawText: string):
 
     const lowerUrl = url.toLowerCase();
     if (lowerUrl.endsWith('.json')) return 'json';
-    if (lowerUrl.endsWith('.html') || lowerUrl.endsWith('.htm')) return 'html';
     if (lowerUrl.endsWith('.xml')) return 'xml';
     if (lowerUrl.endsWith('.csv')) return 'csv';
     if (lowerUrl.endsWith('.yaml') || lowerUrl.endsWith('.yml')) return 'yaml';
@@ -97,9 +94,6 @@ function detectDatasetFormat(contentType: string, url: string, rawText: string):
     }
     if (trimmed.startsWith('<')) {
         const lower = trimmed.substring(0, 200).toLowerCase();
-        if (lower.includes('<!doctype html') || lower.includes('<html')) {
-            return 'html';
-        }
         return 'xml';
     }
     if (trimmed.includes('\n') && trimmed.includes(',')) {
@@ -119,8 +113,6 @@ function convertRawPayload(format: DatasetFormat, rawText: string): unknown {
             return parseCsvToJson(rawText);
         case 'yaml':
             return parseYaml(rawText);
-        case 'html':
-            return { raw: rawText };
         case 'text':
         default:
             return { raw: rawText };

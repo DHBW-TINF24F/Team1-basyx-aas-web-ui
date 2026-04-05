@@ -1,5 +1,4 @@
 import type { IecCddProperty, IecCddValidationResult } from '@/types/IecCdd';
-import { useIecCddHtmlParser } from '@/composables/IecCddHtmlParser';
 
 const IRDI_REGEX = /^\d{4}\/\d+\/\/\/\d+.*#[A-Z0-9]+#\d+$/;
 
@@ -21,8 +20,6 @@ export function useIecCddValidator() {
                 return validateIecJson(payload);
             case 'csv':
                 return validateIecCsv(payload);
-            case 'html':
-                return validateIecCddHtml(payload);
             case 'xlsx': {
                 const result = validateIecCsv(payload);
                 if (result.detectedSchema !== 'unknown') {
@@ -425,47 +422,3 @@ function normalizeToArray(value: unknown): unknown[] {
     return [value];
 }
 
-function validateIecCddHtml(payload: unknown): IecCddValidationResult {
-    const result: IecCddValidationResult = {
-        isValid: false,
-        properties: [],
-        warnings: [],
-        errors: [],
-        detectedSchema: 'iec-html',
-    };
-
-    let htmlText = '';
-    if (typeof payload === 'string') {
-        htmlText = payload;
-    } else if (payload != null && typeof payload === 'object') {
-        const obj = payload as Record<string, unknown>;
-        if (typeof obj['raw'] === 'string') {
-            htmlText = obj['raw'];
-        }
-    }
-
-    if (!htmlText.trim()) {
-        result.errors.push('HTML content is empty. If you tried fetching from cdd.iec.ch, the server may have returned an empty response. Please save the webpage manually in your browser (Ctrl+S) and use "Upload Local File" instead.');
-        result.detectedSchema = 'unknown';
-        return result;
-    }
-
-    const { parseIecCddHtml } = useIecCddHtmlParser();
-    const properties = parseIecCddHtml(htmlText);
-
-    if (properties.length === 0) {
-        result.errors.push('Could not extract IEC-CDD property data from this HTML page. The page may not contain IEC CDD property information in a recognized format.');
-        result.detectedSchema = 'unknown';
-        return result;
-    }
-
-    for (const prop of properties) {
-        if (!IRDI_REGEX.test(prop.irdi)) {
-            result.warnings.push(`Property "${prop.preferredName}" has a non-standard IRDI: "${prop.irdi}".`);
-        }
-        result.properties.push(prop);
-    }
-
-    result.isValid = true;
-    return result;
-}
