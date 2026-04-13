@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { useIecCddValidator } from '@/composables/IecCddValidator';
+import { useIecCddValidator, mapIecDataTypeToAas } from '@/composables/IecCddValidator';
 
 const { validateAndExtractIecCddData } = useIecCddValidator();
 
@@ -76,7 +76,7 @@ describe('IecCddValidator.ts; OntoML XML validation', () => {
         expect(result.properties[0].preferredName).toBe('Rated voltage');
         expect(result.properties[0].shortName).toBe('U_rated');
         expect(result.properties[0].unit).toBe('V');
-        expect(result.properties[0].dataType).toBe('REAL_MEASURE_TYPE');
+        expect(result.properties[0].dataType).toBe('REAL_MEASURE');
 
         expect(result.properties[1].irdi).toBe('0112/2///61360_7#AAE665#006');
         expect(result.properties[1].preferredName).toBe('Rated current');
@@ -161,7 +161,7 @@ describe('IecCddValidator.ts; JSON validation', () => {
         const result = validateAndExtractIecCddData(payload, 'json');
         expect(result.isValid).toBe(true);
         expect(result.properties[0].preferredName).toBe('Rated voltage');
-        expect(result.properties[0].dataType).toBe('REAL_MEASURE_TYPE');
+        expect(result.properties[0].dataType).toBe('REAL_MEASURE');
     });
 
     it('should find nested property arrays', () => {
@@ -271,5 +271,141 @@ describe('IecCddValidator.ts; unsupported format', () => {
         const result = validateAndExtractIecCddData('some text', 'text');
         expect(result.isValid).toBe(false);
         expect(result.detectedSchema).toBe('unknown');
+    });
+});
+
+describe('mapIecDataTypeToAas', () => {
+    it.each([
+        ['REAL_MEASURE_TYPE', 'REAL_MEASURE'],
+        ['STRING_TYPE', 'STRING'],
+        ['BOOLEAN_TYPE', 'BOOLEAN'],
+        ['INTEGER_MEASURE_TYPE', 'INTEGER_MEASURE'],
+        ['INTEGER_COUNT_TYPE', 'INTEGER_COUNT'],
+        ['REAL_COUNT_TYPE', 'REAL_COUNT'],
+        ['REAL_CURRENCY_TYPE', 'REAL_CURRENCY'],
+        ['INTEGER_CURRENCY_TYPE', 'INTEGER_CURRENCY'],
+        ['DATE_TYPE', 'DATE'],
+        ['TIME_TYPE', 'TIME'],
+        ['TIMESTAMP_TYPE', 'TIMESTAMP'],
+        ['RATIONAL_TYPE', 'RATIONAL'],
+        ['RATIONAL_MEASURE_TYPE', 'RATIONAL_MEASURE'],
+        ['STRING_TRANSLATABLE_TYPE', 'STRING_TRANSLATABLE'],
+        ['IRI_TYPE', 'IRI'],
+        ['IRDI_TYPE', 'IRDI'],
+        ['FILE_TYPE', 'FILE'],
+        ['HTML_TYPE', 'HTML'],
+        ['BLOB_TYPE', 'BLOB'],
+        ['LEVEL_TYPE', 'STRING'],
+        ['ENUM_TYPE', 'STRING'],
+    ])('should map IEC CDD type "%s" to AAS type "%s"', (input, expected) => {
+        expect(mapIecDataTypeToAas(input)).toBe(expected);
+    });
+
+    it.each([
+        ['REAL_MEASURE', 'REAL_MEASURE'],
+        ['STRING', 'STRING'],
+        ['BOOLEAN', 'BOOLEAN'],
+        ['DATE', 'DATE'],
+    ])('should pass through already-valid AAS type "%s"', (input, expected) => {
+        expect(mapIecDataTypeToAas(input)).toBe(expected);
+    });
+
+    it('should handle case-insensitive input', () => {
+        expect(mapIecDataTypeToAas('real_measure_type')).toBe('REAL_MEASURE');
+        expect(mapIecDataTypeToAas('String_Type')).toBe('STRING');
+    });
+
+    it('should return undefined for unknown types', () => {
+        expect(mapIecDataTypeToAas('UNKNOWN_FORMAT')).toBeUndefined();
+        expect(mapIecDataTypeToAas('')).toBeUndefined();
+        expect(mapIecDataTypeToAas(undefined)).toBeUndefined();
+    });
+});
+
+describe('IecCddValidator.ts; dataType mapping in extraction', () => {
+    it('should map REAL_MEASURE_TYPE to REAL_MEASURE in XML extraction', () => {
+        const payload = {
+            catalogue: {
+                contained_properties: {
+                    property: {
+                        code: '0112/2///61360_4#AAF286#003',
+                        preferred_name: {
+                            label: { '@attributes': { language: 'en' }, '#text': 'max. torque' },
+                        },
+                        data_type: 'REAL_MEASURE_TYPE',
+                        unit: { short_name: 'N\u00b7m' },
+                    },
+                },
+            },
+        };
+
+        const result = validateAndExtractIecCddData(payload, 'xml');
+        expect(result.isValid).toBe(true);
+        expect(result.properties[0].dataType).toBe('REAL_MEASURE');
+    });
+
+    it('should map STRING_TYPE to STRING in JSON extraction', () => {
+        const payload = [
+            {
+                irdi: '0112/2///61360_7#AAA437#007',
+                preferredName: 'Manufacturer name',
+                dataType: 'STRING_TYPE',
+            },
+        ];
+
+        const result = validateAndExtractIecCddData(payload, 'json');
+        expect(result.isValid).toBe(true);
+        expect(result.properties[0].dataType).toBe('STRING');
+    });
+
+    it('should map data types in XLSX extraction', () => {
+        const payload = [
+            {
+                IRDI: '0112/2///61360_4#AAF286#003',
+                PreferredName: 'max. torque',
+                DataType: 'REAL_MEASURE_TYPE',
+                Unit: 'N\u00b7m',
+            },
+        ];
+
+        const result = validateAndExtractIecCddData(payload, 'xlsx');
+        expect(result.isValid).toBe(true);
+        expect(result.properties[0].dataType).toBe('REAL_MEASURE');
+    });
+
+    it('should preserve unknown data types as-is', () => {
+        const payload = [
+            {
+                irdi: '0112/2///61360_7#AAE664#007',
+                preferredName: 'Test property',
+                dataType: 'CUSTOM_UNKNOWN',
+            },
+        ];
+
+        const result = validateAndExtractIecCddData(payload, 'json');
+        expect(result.isValid).toBe(true);
+        expect(result.properties[0].dataType).toBe('CUSTOM_UNKNOWN');
+    });
+});
+
+describe('IecCddValidator.ts; Unicode NFC normalization', () => {
+    it('should handle NFC-normalized strings from XLSX data', () => {
+        // Simulate NFD decomposed 'ö' (o + combining umlaut) vs NFC 'ö'
+        const nfdString = 'Gro\u0308sse';  // 'Größe' in NFD
+        const nfcString = 'Gr\u00f6sse';   // 'Größe' in NFC
+
+        const payload = [
+            {
+                IRDI: '0112/2///61360_7#AAE664#007',
+                PreferredName: nfdString,
+                Unit: 'V',
+            },
+        ];
+
+        const result = validateAndExtractIecCddData(payload, 'xlsx');
+        expect(result.isValid).toBe(true);
+        // The validator processes strings as-is; NFC normalization happens in IecFileImport
+        // This test verifies extraction still works with non-NFC strings
+        expect(result.properties[0].preferredName).toBeDefined();
     });
 });

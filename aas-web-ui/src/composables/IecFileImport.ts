@@ -146,7 +146,7 @@ function parseIecCddExcelFormat(rawRows: string[][]): Array<Record<string, strin
 
         const firstCell = String(row[0] || '').trim();
         if (firstCell.startsWith('#') && firstCell.toLowerCase().includes('property_name')) {
-            headers = row.map((c) => String(c).replace(/^#/, '').trim());
+            headers = row.map((c) => String(c).normalize('NFC').replace(/^#/, '').trim());
             headerRowIndex = i;
             break;
         }
@@ -157,7 +157,7 @@ function parseIecCddExcelFormat(rawRows: string[][]): Array<Record<string, strin
             lowerCells.some((c) => c.includes(m))
         ).length;
         if (matchCount >= 2) {
-            headers = row.map((c) => String(c).replace(/^#/, '').trim());
+            headers = row.map((c) => String(c).normalize('NFC').replace(/^#/, '').trim());
             headerRowIndex = i;
             break;
         }
@@ -184,7 +184,7 @@ function parseIecCddExcelFormat(rawRows: string[][]): Array<Record<string, strin
         for (let j = 0; j < headers.length; j++) {
             const header = headers[j];
             if (!header) continue;
-            const value = String(row[j] ?? '').trim();
+            const value = String(row[j] ?? '').normalize('NFC').trim();
             obj[header] = value;
             if (value) hasData = true;
         }

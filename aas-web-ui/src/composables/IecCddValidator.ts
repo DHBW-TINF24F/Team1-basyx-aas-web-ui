@@ -2,6 +2,83 @@ import type { IecCddProperty, IecCddValidationResult } from '@/types/IecCdd';
 
 const IRDI_REGEX = /^\d{4}\/\d+\/\/\/\d+.*#[A-Z0-9]+#\d+$/;
 
+/**
+ * Valid AAS DataTypeIec61360 values per IDTA-01003-a v3.1.1.
+ */
+const VALID_AAS_DATA_TYPES = new Set([
+    'DATE',
+    'STRING',
+    'STRING_TRANSLATABLE',
+    'INTEGER_MEASURE',
+    'INTEGER_COUNT',
+    'INTEGER_CURRENCY',
+    'REAL_MEASURE',
+    'REAL_COUNT',
+    'REAL_CURRENCY',
+    'BOOLEAN',
+    'IRI',
+    'IRDI',
+    'RATIONAL',
+    'RATIONAL_MEASURE',
+    'TIME',
+    'TIMESTAMP',
+    'FILE',
+    'HTML',
+    'BLOB',
+]);
+
+/**
+ * Maps IEC CDD data type names to valid AAS DataTypeIec61360 values.
+ * IEC CDD typically appends '_TYPE' (e.g. 'REAL_MEASURE_TYPE' → 'REAL_MEASURE').
+ */
+const IEC_CDD_TO_AAS_DATA_TYPE: Record<string, string> = {
+    'REAL_MEASURE_TYPE': 'REAL_MEASURE',
+    'REAL_COUNT_TYPE': 'REAL_COUNT',
+    'REAL_CURRENCY_TYPE': 'REAL_CURRENCY',
+    'INTEGER_MEASURE_TYPE': 'INTEGER_MEASURE',
+    'INTEGER_COUNT_TYPE': 'INTEGER_COUNT',
+    'INTEGER_CURRENCY_TYPE': 'INTEGER_CURRENCY',
+    'STRING_TYPE': 'STRING',
+    'STRING_TRANSLATABLE_TYPE': 'STRING_TRANSLATABLE',
+    'BOOLEAN_TYPE': 'BOOLEAN',
+    'DATE_TYPE': 'DATE',
+    'TIME_TYPE': 'TIME',
+    'TIMESTAMP_TYPE': 'TIMESTAMP',
+    'RATIONAL_TYPE': 'RATIONAL',
+    'RATIONAL_MEASURE_TYPE': 'RATIONAL_MEASURE',
+    'IRI_TYPE': 'IRI',
+    'IRDI_TYPE': 'IRDI',
+    'FILE_TYPE': 'FILE',
+    'HTML_TYPE': 'HTML',
+    'BLOB_TYPE': 'BLOB',
+    // Additional IEC CDD variants
+    'REAL_TYPE': 'REAL_MEASURE',
+    'INTEGER_TYPE': 'INTEGER_COUNT',
+    'INT_MEASURE_TYPE': 'INTEGER_MEASURE',
+    'INT_COUNT_TYPE': 'INTEGER_COUNT',
+    'INT_CURRENCY_TYPE': 'INTEGER_CURRENCY',
+    'LEVEL_TYPE': 'STRING',
+    'ENUM_TYPE': 'STRING',
+};
+
+/**
+ * Maps a raw IEC CDD data type string to a valid AAS DataTypeIec61360 value.
+ * Returns the mapped value, or undefined if no mapping is found.
+ */
+export function mapIecDataTypeToAas(raw: string | undefined): string | undefined {
+    if (!raw) return undefined;
+    const upper = raw.trim().toUpperCase();
+    if (VALID_AAS_DATA_TYPES.has(upper)) return upper;
+    const mapped = IEC_CDD_TO_AAS_DATA_TYPE[upper];
+    if (mapped) return mapped;
+    // Try stripping _TYPE suffix as a generic fallback
+    if (upper.endsWith('_TYPE')) {
+        const stripped = upper.slice(0, -5);
+        if (VALID_AAS_DATA_TYPES.has(stripped)) return stripped;
+    }
+    return undefined;
+}
+
 const ONTOML_ROOT_ELEMENTS = ['catalogue', 'dictionary'];
 const ONTOML_PROPERTY_CONTAINERS = ['contained_properties', 'properties'];
 
@@ -126,13 +203,15 @@ function extractOntoMlProperty(node: Record<string, unknown>): IecCddProperty | 
     const unitNode = node['unit'] ?? node['Unit'];
     const unit = extractUnitText(unitNode);
 
+    const rawDataType = extractTextValue(node['data_type'] ?? node['DataType'] ?? node['dataType']);
+
     return {
         irdi: code,
         preferredName,
         shortName: extractTextValue(node['short_name'] ?? node['ShortName'] ?? node['shortName']),
         definition,
         unit,
-        dataType: extractTextValue(node['data_type'] ?? node['DataType'] ?? node['dataType']),
+        dataType: mapIecDataTypeToAas(rawDataType) ?? rawDataType,
         valueFormat: extractTextValue(node['value_format'] ?? node['ValueFormat']),
         sourceOfDefinition: extractTextValue(node['source_of_definition'] ?? node['SourceOfDefinition']),
         versionNumber: extractTextValue(node['version_number'] ?? node['VersionNumber']),
@@ -285,6 +364,10 @@ function normalizeJsonProperty(obj: Record<string, unknown>): IecCddProperty | n
     ]);
     if (!irdi || !preferredName) return null;
 
+    const rawDataType = stringOrUndefined(getFieldCaseInsensitive(obj, [
+        'dataType', 'data_type', 'datatype', 'Data_type',
+    ]));
+
     return {
         irdi: String(irdi),
         preferredName: String(preferredName),
@@ -297,9 +380,7 @@ function normalizeJsonProperty(obj: Record<string, unknown>): IecCddProperty | n
         unit: stringOrUndefined(getFieldCaseInsensitive(obj, [
             'unit', 'PrimaryUnit', 'primaryunit', 'Symbol', 'symbol',
         ])),
-        dataType: stringOrUndefined(getFieldCaseInsensitive(obj, [
-            'dataType', 'data_type', 'datatype', 'Data_type',
-        ])),
+        dataType: mapIecDataTypeToAas(rawDataType) ?? rawDataType,
         valueFormat: stringOrUndefined(getFieldCaseInsensitive(obj, [
             'valueFormat', 'value_format', 'Format', 'format',
         ])),

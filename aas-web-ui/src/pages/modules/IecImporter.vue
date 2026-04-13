@@ -245,20 +245,24 @@
         });
     }
 
+    function normalizeStr(value: string | undefined): string | undefined {
+        return value ? value.normalize('NFC') : undefined;
+    }
+
     function buildConceptDescription(property: IecCddProperty): Record<string, unknown> {
-        const preferredName = [{ language: 'en', text: property.preferredName }];
+        const preferredName = [{ language: 'en', text: normalizeStr(property.preferredName) || property.preferredName }];
 
-        const shortName = property.shortName ? [{ language: 'en', text: property.shortName }] : null;
+        const shortName = property.shortName ? [{ language: 'en', text: normalizeStr(property.shortName) }] : null;
 
-        const definition = property.definition ? [{ language: 'en', text: property.definition }] : null;
+        const definition = property.definition ? [{ language: 'en', text: normalizeStr(property.definition) }] : null;
 
         const dataSpecificationContent: Record<string, unknown> = {
             modelType: 'DataSpecificationIec61360',
             preferredName,
         };
         if (shortName) dataSpecificationContent.shortName = shortName;
-        if (property.unit) dataSpecificationContent.unit = property.unit;
-        if (property.sourceOfDefinition) dataSpecificationContent.sourceOfDefinition = property.sourceOfDefinition;
+        if (property.unit) dataSpecificationContent.unit = normalizeStr(property.unit);
+        if (property.sourceOfDefinition) dataSpecificationContent.sourceOfDefinition = normalizeStr(property.sourceOfDefinition);
         if (property.dataType) dataSpecificationContent.dataType = property.dataType;
         if (definition) dataSpecificationContent.definition = definition;
         if (property.valueFormat) dataSpecificationContent.valueFormat = property.valueFormat;
@@ -266,7 +270,7 @@
         return {
             modelType: 'ConceptDescription',
             id: property.irdi,
-            idShort: property.shortName || property.preferredName,
+            idShort: normalizeStr(property.shortName || property.preferredName),
             embeddedDataSpecifications: [
                 {
                     dataSpecification: {
