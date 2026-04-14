@@ -315,10 +315,51 @@ describe('mapIecDataTypeToAas', () => {
         expect(mapIecDataTypeToAas('String_Type')).toBe('STRING');
     });
 
-    it('should return undefined for unknown types', () => {
-        expect(mapIecDataTypeToAas('UNKNOWN_FORMAT')).toBeUndefined();
+    it('should fallback to STRING for unknown types', () => {
+        expect(mapIecDataTypeToAas('UNKNOWN_FORMAT')).toBe('STRING');
+    });
+
+    it.each([
+        ['LEVEL(NOM) OF REAL_MEASURE_TYPE', 'REAL_MEASURE'],
+        ['LEVEL(MIN) OF REAL_MEASURE_TYPE', 'REAL_MEASURE'],
+        ['LEVEL(MAX) OF REAL_MEASURE_TYPE', 'REAL_MEASURE'],
+        ['LEVEL(TYP) OF REAL_MEASURE_TYPE', 'REAL_MEASURE'],
+        ['LEVEL(NOM,MIN,MAX) OF REAL_MEASURE_TYPE', 'REAL_MEASURE'],
+        ['LEVEL(NOM) OF INTEGER_MEASURE_TYPE', 'INTEGER_MEASURE'],
+        ['SET OF STRING_TYPE', 'STRING'],
+        ['BAG OF INTEGER_COUNT_TYPE', 'INTEGER_COUNT'],
+        ['LIST OF BOOLEAN_TYPE', 'BOOLEAN'],
+        ['LEVEL(NOM) OF REAL_COUNT_TYPE', 'REAL_COUNT'],
+    ])('should handle compound IEC expression "%s" → "%s"', (input, expected) => {
+        expect(mapIecDataTypeToAas(input)).toBe(expected);
+    });
+
+    it('should return undefined for empty or undefined input', () => {
         expect(mapIecDataTypeToAas('')).toBeUndefined();
         expect(mapIecDataTypeToAas(undefined)).toBeUndefined();
+    });
+
+    it.each([
+        ['URL_TYPE', 'IRI'],
+        ['URI_TYPE', 'IRI'],
+        ['URL', 'IRI'],
+        ['URI', 'IRI'],
+        ['NUMBER_TYPE', 'REAL_COUNT'],
+        ['DATE_TIME_TYPE', 'TIMESTAMP'],
+        ['DATETIME_TYPE', 'TIMESTAMP'],
+        ['BINARY_TYPE', 'BLOB'],
+        ['HTML5_TYPE', 'HTML'],
+        ['NON_TRANSLATABLE_STRING_TYPE', 'STRING'],
+        ['TRANSLATABLE_STRING_TYPE', 'STRING_TRANSLATABLE'],
+        ['CLASS_REFERENCE_TYPE', 'IRDI'],
+        ['REFERENCE_TYPE', 'IRI'],
+        ['SET_TYPE', 'STRING'],
+        ['RANGE_TYPE', 'STRING'],
+        ['INT_TYPE', 'INTEGER_COUNT'],
+        ['IRDI_STRING', 'IRDI'],
+        ['CURRENCY_TYPE', 'REAL_CURRENCY'],
+    ])('should map additional IEC CDD type "%s" to AAS type "%s"', (input, expected) => {
+        expect(mapIecDataTypeToAas(input)).toBe(expected);
     });
 });
 
@@ -373,7 +414,7 @@ describe('IecCddValidator.ts; dataType mapping in extraction', () => {
         expect(result.properties[0].dataType).toBe('REAL_MEASURE');
     });
 
-    it('should preserve unknown data types as-is', () => {
+    it('should fallback unknown data types to STRING', () => {
         const payload = [
             {
                 irdi: '0112/2///61360_7#AAE664#007',
@@ -384,7 +425,7 @@ describe('IecCddValidator.ts; dataType mapping in extraction', () => {
 
         const result = validateAndExtractIecCddData(payload, 'json');
         expect(result.isValid).toBe(true);
-        expect(result.properties[0].dataType).toBe('CUSTOM_UNKNOWN');
+        expect(result.properties[0].dataType).toBe('STRING');
     });
 });
 

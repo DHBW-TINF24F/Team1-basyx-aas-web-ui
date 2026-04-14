@@ -32,6 +32,7 @@ const VALID_AAS_DATA_TYPES = new Set([
  * IEC CDD typically appends '_TYPE' (e.g. 'REAL_MEASURE_TYPE' → 'REAL_MEASURE').
  */
 const IEC_CDD_TO_AAS_DATA_TYPE: Record<string, string> = {
+    // Direct IEC CDD _TYPE suffix variants
     'REAL_MEASURE_TYPE': 'REAL_MEASURE',
     'REAL_COUNT_TYPE': 'REAL_COUNT',
     'REAL_CURRENCY_TYPE': 'REAL_CURRENCY',
@@ -51,14 +52,38 @@ const IEC_CDD_TO_AAS_DATA_TYPE: Record<string, string> = {
     'FILE_TYPE': 'FILE',
     'HTML_TYPE': 'HTML',
     'BLOB_TYPE': 'BLOB',
-    // Additional IEC CDD variants
+    // Abbreviated IEC CDD variants
     'REAL_TYPE': 'REAL_MEASURE',
     'INTEGER_TYPE': 'INTEGER_COUNT',
+    'INT_TYPE': 'INTEGER_COUNT',
     'INT_MEASURE_TYPE': 'INTEGER_MEASURE',
     'INT_COUNT_TYPE': 'INTEGER_COUNT',
     'INT_CURRENCY_TYPE': 'INTEGER_CURRENCY',
+    // IEC 61360 types without direct AAS equivalent (mapped to closest match)
+    'NUMBER_TYPE': 'REAL_COUNT',
     'LEVEL_TYPE': 'STRING',
     'ENUM_TYPE': 'STRING',
+    'SET_TYPE': 'STRING',
+    'BAG_TYPE': 'STRING',
+    'ARRAY_TYPE': 'STRING',
+    'LIST_TYPE': 'STRING',
+    'RANGE_TYPE': 'STRING',
+    'CURRENCY_TYPE': 'REAL_CURRENCY',
+    // URI / URL / reference variants → IRI or IRDI
+    'URL_TYPE': 'IRI',
+    'URI_TYPE': 'IRI',
+    'URL': 'IRI',
+    'URI': 'IRI',
+    'REFERENCE_TYPE': 'IRI',
+    'CLASS_REFERENCE_TYPE': 'IRDI',
+    'IRDI_STRING': 'IRDI',
+    // Alternative naming conventions from various IEC 61360 versions
+    'DATE_TIME_TYPE': 'TIMESTAMP',
+    'DATETIME_TYPE': 'TIMESTAMP',
+    'NON_TRANSLATABLE_STRING_TYPE': 'STRING',
+    'TRANSLATABLE_STRING_TYPE': 'STRING_TRANSLATABLE',
+    'BINARY_TYPE': 'BLOB',
+    'HTML5_TYPE': 'HTML',
 };
 
 /**
@@ -71,12 +96,21 @@ export function mapIecDataTypeToAas(raw: string | undefined): string | undefined
     if (VALID_AAS_DATA_TYPES.has(upper)) return upper;
     const mapped = IEC_CDD_TO_AAS_DATA_TYPE[upper];
     if (mapped) return mapped;
+    // Handle compound IEC 61360 expressions like "LEVEL(NOM) OF REAL_MEASURE_TYPE"
+    // or "SET OF STRING_TYPE". Extract the base type after "OF ".
+    const ofIndex = upper.lastIndexOf(' OF ');
+    if (ofIndex !== -1) {
+        const baseType = upper.slice(ofIndex + 4).trim();
+        return mapIecDataTypeToAas(baseType);
+    }
     // Try stripping _TYPE suffix as a generic fallback
     if (upper.endsWith('_TYPE')) {
         const stripped = upper.slice(0, -5);
         if (VALID_AAS_DATA_TYPES.has(stripped)) return stripped;
     }
-    return undefined;
+    // Fallback: unmapped IEC data types default to STRING to avoid
+    // sending invalid data type values to the AAS server.
+    return 'STRING';
 }
 
 const ONTOML_ROOT_ELEMENTS = ['catalogue', 'dictionary'];
@@ -218,13 +252,17 @@ function extractOntoMlProperty(node: Record<string, unknown>): IecCddProperty | 
     };
 }
 
+function normalizeNfc(str: string): string {
+    return str.normalize('NFC');
+}
+
 function extractTextValue(value: unknown): string | undefined {
     if (value == null) return undefined;
-    if (typeof value === 'string') return value || undefined;
+    if (typeof value === 'string') return value ? normalizeNfc(value) : undefined;
     if (typeof value === 'object') {
         const obj = value as Record<string, unknown>;
-        if (typeof obj['#text'] === 'string') return obj['#text'] || undefined;
-        if (typeof obj['short_name'] === 'string') return obj['short_name'] || undefined;
+        if (typeof obj['#text'] === 'string') return obj['#text'] ? normalizeNfc(obj['#text']) : undefined;
+        if (typeof obj['short_name'] === 'string') return obj['short_name'] ? normalizeNfc(obj['short_name']) : undefined;
     }
     return undefined;
 }
@@ -369,8 +407,8 @@ function normalizeJsonProperty(obj: Record<string, unknown>): IecCddProperty | n
     ]));
 
     return {
-        irdi: String(irdi),
-        preferredName: String(preferredName),
+        irdi: String(irdi).normalize('NFC'),
+        preferredName: String(preferredName).normalize('NFC'),
         shortName: stringOrUndefined(getFieldCaseInsensitive(obj, [
             'shortName', 'short_name', 'ShortName.EN', 'shortname.en',
         ])),
@@ -419,7 +457,7 @@ function getFieldCaseInsensitive(
 
 function stringOrUndefined(value: unknown): string | undefined {
     if (value == null) return undefined;
-    const str = String(value);
+    const str = String(value).normalize('NFC');
     return str || undefined;
 }
 
