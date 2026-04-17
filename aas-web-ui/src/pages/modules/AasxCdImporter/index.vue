@@ -61,6 +61,7 @@
                 <v-alert
                     v-if="phase === 'ready' || phase === 'done'"
                     type="info"
+                    color="#2b2b2b"
                     density="compact"
                     border="start"
                     class="mb-4">
