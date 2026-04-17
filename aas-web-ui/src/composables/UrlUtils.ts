@@ -47,15 +47,15 @@ export function useUrlUtils () {
 }
 
 export type QueryParam = {
-  key: string;
-  value: string;
+  key: string
+  value: string
 }
 
 /**
  * Adds provided query params to the url.
  * This function assumes that this url does not already have any query params added.
  * Strips away the urls trailing / if it exists.
- * 
+ *
  * @param url the url to add query params to
  * @param queryParams the query params to add
  * @returns the url with added query params
@@ -70,10 +70,10 @@ export function addQueryParams (url: string, queryParams: Array<QueryParam>): st
   }
 
   let queryParamString = ''
-  queryParams.forEach(queryParam => {
-    let paramDelimiter = queryParamString.length > 0 ? '&' : '?'
+  for (const queryParam of queryParams) {
+    const paramDelimiter = queryParamString.length > 0 ? '&' : '?'
     queryParamString += paramDelimiter + queryParam.key + '=' + queryParam.value
-  })
-  
+  }
+
   return url + queryParamString
 }

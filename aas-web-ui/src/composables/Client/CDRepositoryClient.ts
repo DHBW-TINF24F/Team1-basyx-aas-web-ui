@@ -1,12 +1,12 @@
+import type { QueryParam } from '@/composables/UrlUtils'
 import type { types as aasTypes } from '@aas-core-works/aas-core3.1-typescript'
 import { jsonization } from '@aas-core-works/aas-core3.1-typescript'
 import { computed } from 'vue'
 import { useRequestHandling } from '@/composables/RequestHandling'
+import { addQueryParams } from '@/composables/UrlUtils'
 import { useInfrastructureStore } from '@/store/InfrastructureStore'
 import { base64Encode } from '@/utils/EncodeDecodeUtils'
 import { stripLastCharacter } from '@/utils/StringUtils'
-import { addQueryParams } from '@/composables/UrlUtils'
-import type { QueryParam } from '@/composables/UrlUtils'
 
 export function useCDRepositoryClient () {
   // Stores
