@@ -2,7 +2,7 @@
     <v-container max-width="1200">
         <v-card>
             <v-card-title align="center">IEC Importer</v-card-title>
-            <v-card-subtitle class="text-center pb-2">Import von lokalen Excel-Dateien</v-card-subtitle>
+            <v-card-subtitle class="text-center pb-2">Import von lokalen Excel-Dateien (Mehrfachauswahl moeglich)</v-card-subtitle>
             <v-divider />
             <v-card-text>
                 <!-- File Upload Button -->
@@ -15,19 +15,21 @@
                     class="mb-3"
                     :loading="datasetLoading"
                     @click="triggerFileInput"
-                    >Datei hochladen</v-btn
+                    >Dateien hochladen</v-btn
                 >
                 <input
                     ref="fileInputRef"
                     type="file"
                     accept=".xml,.json,.csv,.yaml,.yml,.xlsx,.xls"
+                    multiple
                     style="display: none"
                     @change="handleFileUpload" />
 
                 <!-- Info Alerts -->
                 <v-alert density="compact" class="mb-3" type="info" variant="tonal">
                     Der IEC Importer unterstuetzt ausschliesslich den Import ueber Datei-Upload. Laden Sie
-                    IEC-CDD-Datensaetze als Excel-Datei herunter und laden Sie diese hier hoch.
+                    IEC-CDD-Datensaetze als Excel-Dateien herunter und laden Sie diese hier hoch. Sie koennen mehrere
+                    Dateien gleichzeitig auswaehlen.
                 </v-alert>
 
                 <v-alert density="compact" class="mb-3" type="info" variant="tonal">
@@ -41,7 +43,7 @@
                     class="mb-3"
                     type="success"
                     variant="tonal">
-                    Detected format: {{ importedDatasetFormat }}
+                    Erkannte Formate: {{ importedDatasetFormat }}
                 </v-alert>
 
                 <!-- Validation Feedback -->
@@ -51,8 +53,7 @@
                     class="mb-3"
                     type="success"
                     variant="tonal">
-                    Valid IEC-CDD data detected ({{ validationResult.properties.length }} properties found, schema:
-                    {{ validationResult.detectedSchema }})
+                    {{ validationResult.properties.length }} IEC-CDD Properties gefunden
                 </v-alert>
 
                 <v-alert
@@ -160,19 +161,22 @@
 </template>
 
 <script setup lang="ts">
+    import { jsonization } from '@aas-core-works/aas-core3.1-typescript';
     import { ref } from 'vue';
     import type { IecCddProperty, IecCddValidationResult } from '@/types/IecCdd';
     import { useIecFileImport } from '@/composables/IecFileImport';
     import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
     import { useNavigationStore } from '@/store/NavigationStore';
+    import { useInfrastructureStore } from '@/store/InfrastructureStore';
 
     defineOptions({
         moduleTitle: 'IEC Importer',
     });
 
     const navigationStore = useNavigationStore();
+    const infrastructureStore = useInfrastructureStore();
     const { importFileContent } = useIecFileImport();
-    const { createCd, updateCd, isAvailableByIdInRepo } = useCDRepositoryClient();
+    const { postConceptDescription, putConceptDescription, isAvailableByIdInRepo } = useCDRepositoryClient();
 
     const datasetLoading = ref<boolean>(false);
     const savingCds = ref<boolean>(false);
@@ -199,50 +203,62 @@
 
     async function handleFileUpload(event: Event): Promise<void> {
         const input = event.target as HTMLInputElement;
-        const file = input.files?.[0];
-        if (!file) return;
+        const files = input.files;
+        if (!files || files.length === 0) return;
 
         datasetLoading.value = true;
+        const allProperties: IecCddProperty[] = [];
+        const allResults: Array<{ metadata: { detectedFormat: string }; payload: unknown; validation: IecCddValidationResult }> = [];
+        const formats = new Set<string>();
+        let failedFiles: string[] = [];
+        const warnings: string[] = [];
+
         try {
-            const result = await importFileContent(file);
-            handleImportResult(result, `File "${file.name}" imported`);
+            for (const file of Array.from(files)) {
+                const result = await importFileContent(file);
+                if (!result.success || !result.data) {
+                    failedFiles.push(file.name);
+                    continue;
+                }
+                formats.add(result.data.metadata.detectedFormat.toUpperCase());
+                allResults.push(result.data);
+                if (result.data.validation.isValid) {
+                    allProperties.push(...result.data.validation.properties);
+                }
+                if (result.data.validation.warnings.length > 0) {
+                    warnings.push(...result.data.validation.warnings.map((w) => `${file.name}: ${w}`));
+                }
+            }
+
+            importedDatasetFormat.value = Array.from(formats).join(', ');
+            importedDatasetJsonPreview.value = JSON.stringify(allResults, null, 2);
+
+            validationResult.value = {
+                isValid: allProperties.length > 0,
+                properties: allProperties,
+                detectedSchema: allResults.length > 0 ? allResults[0].validation.detectedSchema : '',
+                errors: failedFiles.map((f) => `Import fehlgeschlagen: ${f}`),
+                warnings,
+            };
+
+            const totalProps = allProperties.length;
+            const successCount = allResults.length;
+            const failCount = failedFiles.length;
+
+            let message = `${successCount} Datei(en) importiert — ${totalProps} IEC-CDD Properties gefunden.`;
+            if (failCount > 0) message += ` ${failCount} Datei(en) fehlgeschlagen.`;
+
+            navigationStore.dispatchSnackbar({
+                status: true,
+                timeout: 5000,
+                color: failCount > 0 ? 'warning' : totalProps > 0 ? 'success' : 'warning',
+                btnColor: 'buttonText',
+                text: message,
+            });
         } finally {
             datasetLoading.value = false;
             input.value = '';
         }
-    }
-
-    function handleImportResult(
-        result: { success: boolean; data?: { metadata: { detectedFormat: string }; payload: unknown; validation: IecCddValidationResult }; error?: string },
-        successPrefix: string
-    ): void {
-        if (!result.success || !result.data) {
-            navigationStore.dispatchSnackbar({
-                status: true,
-                timeout: 8000,
-                color: 'error',
-                btnColor: 'buttonText',
-                text: 'Import failed',
-                extendedError: result.error || 'Unknown conversion error',
-            });
-            return;
-        }
-
-        importedDatasetFormat.value = result.data.metadata.detectedFormat.toUpperCase();
-        importedDatasetJsonPreview.value = JSON.stringify(result.data, null, 2);
-        validationResult.value = result.data.validation;
-
-        const validationInfo = result.data.validation.isValid
-            ? ` — ${result.data.validation.properties.length} IEC-CDD properties found.`
-            : ' — No IEC-CDD properties detected.';
-
-        navigationStore.dispatchSnackbar({
-            status: true,
-            timeout: 5000,
-            color: result.data.validation.isValid ? 'success' : 'warning',
-            btnColor: 'buttonText',
-            text: `${successPrefix} (${importedDatasetFormat.value})${validationInfo}`,
-        });
     }
 
     function normalizeStr(value: string | undefined): string | undefined {
@@ -291,6 +307,13 @@
     async function saveAsConceptDescriptions(): Promise<void> {
         if (!validationResult.value || !validationResult.value.isValid) return;
 
+        const cdRepoUrl = infrastructureStore.getConceptDescriptionRepoURL;
+        if (!cdRepoUrl || cdRepoUrl.trim() === '') {
+            saveResultType.value = 'error';
+            saveResultMessage.value = 'Concept Description Repository URL ist nicht konfiguriert. Bitte in den Infrastruktur-Einstellungen setzen.';
+            return;
+        }
+
         savingCds.value = true;
         saveResultMessage.value = '';
         let created = 0;
@@ -299,17 +322,26 @@
 
         try {
             for (const property of validationResult.value.properties) {
-                const cd = buildConceptDescription(property);
+                const cdJson = buildConceptDescription(property);
+                const cdResult = jsonization.conceptDescriptionFromJsonable(cdJson);
+
+                if (cdResult.error !== null) {
+                    console.warn('Failed to deserialize CD for IRDI', property.irdi, cdResult.error);
+                    failed++;
+                    continue;
+                }
+
+                const cd = cdResult.mustValue();
                 const exists = await isAvailableByIdInRepo(property.irdi);
 
-                let result;
+                let success;
                 if (exists) {
-                    result = await updateCd(property.irdi, cd);
-                    if (result.success) updated++;
+                    success = await putConceptDescription(cd);
+                    if (success) updated++;
                     else failed++;
                 } else {
-                    result = await createCd(cd);
-                    if (result.success) created++;
+                    success = await postConceptDescription(cd);
+                    if (success) created++;
                     else failed++;
                 }
             }

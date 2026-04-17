@@ -98,6 +98,13 @@ export function useCDRepositoryClient () {
     return fetchCd(cdEndpoint)
   }
 
+  /**
+   * Fetches a Concept Description (CD) by the provided CD endpoint.
+   *
+   * @async
+   * @param {string} cdEndpoint - The endpoint URL of the CD to fetch.
+   * @returns {Promise<any>} A promise that resolves to a CD.
+   */
   async function fetchCd (cdEndpoint: string): Promise<any> {
     const failResponse = {} as any
 
@@ -118,6 +125,8 @@ export function useCDRepositoryClient () {
       const cdRepoResponse = await getRequest(cdRepoPath, cdRepoContext, disableMessage)
       if (cdRepoResponse?.success && cdRepoResponse?.data && Object.keys(cdRepoResponse?.data).length > 0) {
         const cd = cdRepoResponse.data
+        // Add endpoint to CD
+        // Note: not specified and standardized in IDTA-01001-3-0-1 Specification Asset Administration Shell Part 1 Metamodel
         cd.endpoints = [{ protocolInformation: { href: cdRepoPath }, interface: 'CONCEPTDESCRIPTION-3.0' }]
         return cd
       }
@@ -129,6 +138,13 @@ export function useCDRepositoryClient () {
     return failResponse
   }
 
+  /**
+   * Checks if Concept Description with provided ID is available (in repository)
+   *
+   * @async
+   * @param {string} cdId - The ID of the CD to check.
+   * @returns {Promise<boolean>} A promise that resolves to `true` if CD with provided ID is available, otherwise `false`.
+   */
   async function isAvailableByIdInRepo (cdId: string): Promise<boolean> {
     const failResponse = false
 
@@ -151,6 +167,13 @@ export function useCDRepositoryClient () {
     return failResponse
   }
 
+  /**
+   * Checks if Concept Description (CD) is available (in repository) by the provided CD endpoint
+   *
+   * @async
+   * @param {string} cdEndpoint - The endpoint URL of the CD to check.
+   * @returns {Promise<boolean>} A promise that resolves to `true` if CD with provided ID is available, otherwise `false`.
+   */
   async function isAvailable (cdEndpoint: string): Promise<boolean> {
     const failResponse = false
 
@@ -280,52 +303,6 @@ export function useCDRepositoryClient () {
     return response.success
   }
 
-  async function createCd (cd: any): Promise<{ success: boolean; data?: any }> {
-    const failResponse = { success: false }
-
-    if (!cd) return failResponse
-
-    let cdRepoUrl = conceptDescriptionRepoUrl.value
-    if (cdRepoUrl.trim() === '') return failResponse
-    if (cdRepoUrl.endsWith('/')) cdRepoUrl = stripLastCharacter(cdRepoUrl)
-    if (!cdRepoUrl.endsWith(endpointPath)) cdRepoUrl += endpointPath
-
-    const headers = new Headers()
-    headers.set('Content-Type', 'application/json')
-
-    try {
-      const response = await postRequest(cdRepoUrl, JSON.stringify(cd), headers, 'creating CD', false)
-      return response ?? failResponse
-    } catch (e) {
-      console.warn(e)
-      return failResponse
-    }
-  }
-
-  async function updateCd (cdId: string, cd: any): Promise<{ success: boolean; data?: any }> {
-    const failResponse = { success: false }
-
-    if (!cdId || !cd) return failResponse
-
-    let cdRepoUrl = conceptDescriptionRepoUrl.value
-    if (cdRepoUrl.trim() === '') return failResponse
-    if (cdRepoUrl.endsWith('/')) cdRepoUrl = stripLastCharacter(cdRepoUrl)
-    if (!cdRepoUrl.endsWith(endpointPath)) cdRepoUrl += endpointPath
-
-    const cdEndpoint = cdRepoUrl + '/' + base64Encode(cdId)
-
-    const headers = new Headers()
-    headers.set('Content-Type', 'application/json')
-
-    try {
-      const response = await putRequest(cdEndpoint, JSON.stringify(cd), headers, 'updating CD', false)
-      return response ?? failResponse
-    } catch (e) {
-      console.warn(e)
-      return failResponse
-    }
-  }
-
   return {
     endpointPath,
     fetchCdList,
@@ -336,7 +313,5 @@ export function useCDRepositoryClient () {
     getCdEndpointById,
     postConceptDescription,
     putConceptDescription,
-    createCd,
-    updateCd,
   }
 }
