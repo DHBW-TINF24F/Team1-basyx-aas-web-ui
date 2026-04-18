@@ -2,7 +2,7 @@
     <v-container max-width="1200">
         <v-card>
             <v-card-title align="center">IEC Importer</v-card-title>
-            <v-card-subtitle class="text-center pb-2">Import von lokalen Excel-Dateien (Mehrfachauswahl moeglich)</v-card-subtitle>
+            <v-card-subtitle class="text-center pb-2">Import local Excel files (multiple selection supported)</v-card-subtitle>
             <v-divider />
             <v-card-text>
                 <!-- File Upload Button -->
@@ -15,7 +15,7 @@
                     class="mb-3"
                     :loading="datasetLoading"
                     @click="triggerFileInput"
-                    >Dateien hochladen</v-btn
+                    >Upload files</v-btn
                 >
                 <input
                     ref="fileInputRef"
@@ -27,13 +27,12 @@
 
                 <!-- Info Alerts -->
                 <v-alert density="compact" class="mb-3" type="info" variant="tonal">
-                    Der IEC Importer unterstuetzt ausschliesslich den Import ueber Datei-Upload. Laden Sie
-                    IEC-CDD-Datensaetze als Excel-Dateien herunter und laden Sie diese hier hoch. Sie koennen mehrere
-                    Dateien gleichzeitig auswaehlen.
+                    The IEC Importer only supports import via file upload. Download IEC-CDD datasets as Excel files and
+                    upload them here. You can select multiple files at once.
                 </v-alert>
 
                 <v-alert density="compact" class="mb-3" type="info" variant="tonal">
-                    Unterstuetzte Formate: XLSX/XLS (Excel), sowie JSON, XML, CSV und YAML.
+                    Supported formats: XLSX/XLS (Excel), as well as JSON, XML, CSV and YAML.
                 </v-alert>
 
                 <!-- Format Detection -->
@@ -43,7 +42,7 @@
                     class="mb-3"
                     type="success"
                     variant="tonal">
-                    Erkannte Formate: {{ importedDatasetFormat }}
+                    Detected formats: {{ importedDatasetFormat }}
                 </v-alert>
 
                 <!-- Validation Feedback -->
@@ -53,7 +52,7 @@
                     class="mb-3"
                     type="success"
                     variant="tonal">
-                    {{ validationResult.properties.length }} IEC-CDD Properties gefunden
+                    {{ validationResult.properties.length }} IEC-CDD properties found
                 </v-alert>
 
                 <v-alert
@@ -114,7 +113,7 @@
                     class="mb-3"
                     :loading="savingCds"
                     @click="saveAsConceptDescriptions"
-                    >Als Concept Descriptions speichern</v-btn
+                    >Save as Concept Descriptions</v-btn
                 >
 
                 <!-- Save Result -->
@@ -237,7 +236,7 @@
                 isValid: allProperties.length > 0,
                 properties: allProperties,
                 detectedSchema: allResults.length > 0 ? allResults[0].validation.detectedSchema : '',
-                errors: failedFiles.map((f) => `Import fehlgeschlagen: ${f}`),
+                errors: failedFiles.map((f) => `Import failed: ${f}`),
                 warnings,
             };
 
@@ -245,8 +244,8 @@
             const successCount = allResults.length;
             const failCount = failedFiles.length;
 
-            let message = `${successCount} Datei(en) importiert — ${totalProps} IEC-CDD Properties gefunden.`;
-            if (failCount > 0) message += ` ${failCount} Datei(en) fehlgeschlagen.`;
+            let message = `${successCount} file(s) imported — ${totalProps} IEC-CDD properties found.`;
+            if (failCount > 0) message += ` ${failCount} file(s) failed.`;
 
             navigationStore.dispatchSnackbar({
                 status: true,
@@ -310,7 +309,7 @@
         const cdRepoUrl = infrastructureStore.getConceptDescriptionRepoURL;
         if (!cdRepoUrl || cdRepoUrl.trim() === '') {
             saveResultType.value = 'error';
-            saveResultMessage.value = 'Concept Description Repository URL ist nicht konfiguriert. Bitte in den Infrastruktur-Einstellungen setzen.';
+            saveResultMessage.value = 'Concept Description Repository URL is not configured. Please set it in the infrastructure settings.';
             return;
         }
 
@@ -348,14 +347,14 @@
 
             if (failed === 0) {
                 saveResultType.value = 'success';
-                saveResultMessage.value = `Erfolgreich gespeichert: ${created} erstellt, ${updated} aktualisiert.`;
+                saveResultMessage.value = `Successfully saved: ${created} created, ${updated} updated.`;
             } else {
                 saveResultType.value = 'error';
-                saveResultMessage.value = `${created} erstellt, ${updated} aktualisiert, ${failed} fehlgeschlagen.`;
+                saveResultMessage.value = `${created} created, ${updated} updated, ${failed} failed.`;
             }
         } catch (e) {
             saveResultType.value = 'error';
-            saveResultMessage.value = `Fehler beim Speichern: ${e instanceof Error ? e.message : 'Unbekannter Fehler'}`;
+            saveResultMessage.value = `Error while saving: ${e instanceof Error ? e.message : 'Unknown error'}`;
         } finally {
             savingCds.value = false;
         }

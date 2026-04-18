@@ -204,6 +204,12 @@ export function useCDRepositoryClient () {
     return failResponse
   }
 
+  /**
+   * Retrieves the Concept Description (CD) endpoint URL by its ID.
+   *
+   * @param {string} cdId - The ID of the CD to retrieve the endpoint for.
+   * @returns {string} A CD endpoint.
+   */
   function getCdEndpointById (cdId: string): string {
     const failResponse = ''
 
