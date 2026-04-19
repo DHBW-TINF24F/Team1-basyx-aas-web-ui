@@ -125,11 +125,9 @@ export function useCDRepositoryClient () {
       const cdRepoResponse = await getRequest(cdRepoPath, cdRepoContext, disableMessage)
       if (cdRepoResponse?.success && cdRepoResponse?.data && Object.keys(cdRepoResponse?.data).length > 0) {
         const cd = cdRepoResponse.data
-
         // Add endpoint to CD
         // Note: not specified and standardized in IDTA-01001-3-0-1 Specification Asset Administration Shell Part 1 Metamodel
         cd.endpoints = [{ protocolInformation: { href: cdRepoPath }, interface: 'CONCEPTDESCRIPTION-3.0' }]
-
         return cd
       }
     } catch (error) {

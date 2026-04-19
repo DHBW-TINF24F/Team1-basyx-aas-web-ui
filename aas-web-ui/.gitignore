@@ -25,3 +25,6 @@ tsconfig.tsbuildinfo
 
 # coverages
 /coverage
+
+# lock files
+package-lock.json
