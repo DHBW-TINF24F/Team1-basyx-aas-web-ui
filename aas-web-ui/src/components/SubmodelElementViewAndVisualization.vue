@@ -27,6 +27,10 @@
               <v-icon start>mdi-code-block-braces</v-icon>
               <span class="hidden-sm-and-down">JSON</span>
             </v-btn>
+            <v-btn class="ma-0" value="JSONView">
+              <v-icon start>mdi-code-block-braces</v-icon>
+              <span class="hidden-sm-and-down">JSON</span>
+            </v-btn>
           </v-btn-toggle>
         </div>
       </v-card-title>

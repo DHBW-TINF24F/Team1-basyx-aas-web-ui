@@ -443,10 +443,10 @@ function collectEdsAsCds (
     const idCandidate = keys.length > 0 ? asString(asRecord(keys[0])?.value ?? '').trim() : ''
 
     if (idCandidate !== '') {
-      const iec360Eds = eds.filter((e) => {
+      const iec360Eds = eds.filter(e => {
         const spec = asRecord(asRecord(e)?.dataSpecification)
         const specKeys = spec ? asArray(spec.keys) : []
-        return specKeys.some((k) => asString(asRecord(k)?.value ?? '') === IEC_IRI)
+        return specKeys.some(k => asString(asRecord(k)?.value ?? '') === IEC_IRI)
       })
 
       if (iec360Eds.length > 0 && !result.has(idCandidate)) {
@@ -458,8 +458,8 @@ function collectEdsAsCds (
         try {
           const parsed = parseConceptDescription(cdJson)
           result.set(idCandidate, { core: parsed.core, json: parsed.json, source: 'eds' })
-        } catch (e) {
-          warnings.push(`Skipped EDS from element '${idCandidate}': ${stringifyUnknown(e)}`)
+        } catch (error) {
+          warnings.push(`Skipped EDS from element '${idCandidate}': ${stringifyUnknown(error)}`)
         }
       }
     }
@@ -494,8 +494,8 @@ export async function extractCdsFromAasx (file: File): Promise<ExtractCdsResult>
           if (id !== '') {
             cdById.set(id, { ...parsed, source: 'cd' })
           }
-        } catch (e) {
-          warnings.push(`Skipped CD: ${stringifyUnknown(e)}`)
+        } catch (error) {
+          warnings.push(`Skipped CD: ${stringifyUnknown(error)}`)
         }
       }
     }
