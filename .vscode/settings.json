@@ -21,10 +21,12 @@
     "editor.tabSize": 2
   },
   "[typescript]": {
+    "editor.formatOnSave": false,
     "editor.insertSpaces": true,
     "editor.tabSize": 2
   },
   "[javascript]": {
+    "editor.formatOnSave": false,
     "editor.insertSpaces": true,
     "editor.tabSize": 2
   }
