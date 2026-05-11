@@ -1,4 +1,5 @@
 import { useRequestHandling } from '@/composables/RequestHandling'
+import { stripLastCharacter } from '@/utils/StringUtils'
 
 export const urlRegex
   = /^(?:(?:(?:https?|ftp):)?\/\/)(?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z0-9\u00A1-\uFFFF][a-z0-9\u00A1-\uFFFF_-]{0,62})?[a-z0-9\u00A1-\uFFFF]\.)+(?:[a-z\u00A1-\uFFFF]{2,}\.?))(?::\d{2,5})?(?:[/?#]\S*)?$/i
@@ -43,4 +44,36 @@ export function useUrlUtils () {
   }
 
   return { getBlobUrl }
+}
+
+export type QueryParam = {
+  key: string
+  value: string
+}
+
+/**
+ * Adds provided query params to the url.
+ * This function assumes that this url does not already have any query params added.
+ * Strips away the urls trailing / if it exists.
+ *
+ * @param url the url to add query params to
+ * @param queryParams the query params to add
+ * @returns the url with added query params
+ */
+export function addQueryParams (url: string, queryParams: Array<QueryParam>): string {
+  if (queryParams.length === 0) {
+    return url
+  }
+
+  if (url.endsWith('/')) {
+    url = stripLastCharacter(url)
+  }
+
+  let queryParamString = ''
+  for (const queryParam of queryParams) {
+    const paramDelimiter = queryParamString.length > 0 ? '&' : '?'
+    queryParamString += paramDelimiter + queryParam.key + '=' + queryParam.value
+  }
+
+  return url + queryParamString
 }
