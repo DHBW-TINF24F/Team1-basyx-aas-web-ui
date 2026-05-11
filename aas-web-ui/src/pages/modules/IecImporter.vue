@@ -173,6 +173,7 @@
           class="mb-3"
           :rows="conceptDescriptionRows"
           :show-source="false"
+          @view-diff="openDiffDialog"
         />
 
         <!-- Save to CD Repository -->
@@ -225,6 +226,74 @@
         </v-expansion-panels>
       </v-card-text>
     </v-card>
+
+    <!-- Diff Dialog -->
+    <v-dialog v-model="diffDialogOpen" width="800">
+      <v-sheet border rounded="lg">
+        <v-card-title class="bg-cardHeader">
+          <v-icon class="mr-2" icon="mdi-compare" />
+          Compare Concept Descriptions
+        </v-card-title>
+        <v-divider />
+        <v-card-text>
+          <p class="text-caption text-medium-emphasis mb-3">
+            <strong>ID:</strong> {{ diffRow?.id }}
+          </p>
+          <template v-if="diffRow && diffRow.existingJson">
+            <v-alert
+              v-if="computeCdDiff(diffRow.json, diffRow.existingJson).length === 0"
+              class="mb-3"
+              density="compact"
+              type="success"
+            >
+              No differences found. The incoming CD is identical to the existing one.
+            </v-alert>
+
+            <v-table v-else class="border rounded mb-3" density="compact">
+              <thead>
+                <tr>
+                  <th style="width:160px">Field</th>
+                  <th>
+                    <v-chip class="mr-1" color="primary" size="x-small">Incoming</v-chip>
+                    from IEC file
+                  </th>
+                  <th>
+                    <v-chip class="mr-1" color="warning" size="x-small">Existing</v-chip>
+                    in Repository
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="diff in computeCdDiff(diffRow.json, diffRow.existingJson)"
+                  :key="diff.field"
+                >
+                  <td class="text-caption font-weight-bold">{{ diff.field }}</td>
+                  <td class="text-caption text-success">
+                    <pre style="white-space: pre-wrap; word-break: break-all">{{ diff.incoming }}</pre>
+                  </td>
+                  <td class="text-caption text-warning">
+                    <pre style="white-space: pre-wrap; word-break: break-all">{{ diff.existing }}</pre>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+
+            <v-alert density="compact" type="info">
+              The row is currently
+              <strong>{{ diffRow.selected ? 'selected' : 'deselected' }}</strong> —
+              {{ diffRow.selected ? 'saving will overwrite the existing CD with the incoming version.' : 'the existing version will be kept.' }}
+              Toggle the checkbox in the table to change your selection.
+            </v-alert>
+          </template>
+        </v-card-text>
+        <v-divider />
+        <v-card-actions>
+          <v-spacer />
+          <v-btn rounded="lg" @click="diffDialogOpen = false">Close</v-btn>
+        </v-card-actions>
+      </v-sheet>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -248,7 +317,13 @@
   const { importFileContent } = useIecFileImport()
   const { fetchCdList, postConceptDescription, putConceptDescription } = useCDRepositoryClient()
 
-  type IecCdRow = ConceptDescriptionTableRow & { property: IecCddProperty }
+  type JsonRecord = Record<string, unknown>
+  type IecCdRow = ConceptDescriptionTableRow & {
+    property: IecCddProperty
+    json: JsonRecord
+    existingJson: JsonRecord | null
+  }
+  type DiffEntry = { field: string, incoming: string, existing: string }
 
   const datasetLoading = ref<boolean>(false)
   const savingCds = ref<boolean>(false)
@@ -259,6 +334,8 @@
   const saveResultMessage = ref<string>('')
   const saveResultType = ref<'success' | 'error' | 'info'>('success')
   const conceptDescriptionRows = ref<IecCdRow[]>([])
+  const diffDialogOpen = ref<boolean>(false)
+  const diffRow = ref<IecCdRow | null>(null)
 
   function triggerFileInput (): void {
     fileInputRef.value?.click()
@@ -305,13 +382,13 @@
         warnings,
       }
 
-      const existingIds = new Set<string>()
+      const existingById = new Map<string, JsonRecord>()
       if (allProperties.length > 0) {
         try {
           const existingCds = await fetchCdList()
           for (const cd of existingCds) {
             const id = String(cd?.id ?? '').trim()
-            if (id !== '') existingIds.add(id)
+            if (id !== '') existingById.set(id, cd as JsonRecord)
           }
         } catch {
           warnings.push('Could not fetch existing CDs from repository — all properties will be treated as NEW.')
@@ -327,8 +404,10 @@
         unit: property.unit ?? '',
         dataType: property.dataType ?? '',
         selected: true,
-        status: existingIds.has(property.irdi) ? 'exists' : 'new',
+        status: existingById.has(property.irdi) ? 'exists' : 'new',
         property,
+        json: buildConceptDescription(property),
+        existingJson: existingById.get(property.irdi) ?? null,
       }))
 
       const totalProps = allProperties.length
@@ -473,6 +552,57 @@
     )
     const csvContent = [headers.join(','), ...rows].join('\n')
     downloadBlob(csvContent, 'iec-cdd-properties.csv', 'text/csv')
+  }
+
+  function extractDataSpecificationContent (json: JsonRecord): JsonRecord | null {
+    const eds = Array.isArray(json.embeddedDataSpecifications) ? json.embeddedDataSpecifications : []
+    if (eds.length === 0) return null
+    return ((eds[0] as any)?.dataSpecificationContent ?? null) as JsonRecord | null
+  }
+
+  function computeCdDiff (incoming: JsonRecord, existing: JsonRecord): DiffEntry[] {
+    const diffs: DiffEntry[] = []
+
+    const stringify = (v: unknown): string => {
+      if (v === undefined || v === null) return '—'
+      if (typeof v === 'string') return v
+      return JSON.stringify(v, null, 2)
+    }
+
+    for (const field of ['id', 'category', 'idShort']) {
+      const a = stringify(incoming[field])
+      const b = stringify(existing[field])
+      if (a !== b) diffs.push({ field, incoming: a, existing: b })
+    }
+
+    for (const field of ['displayName', 'description']) {
+      const a = stringify(incoming[field])
+      const b = stringify(existing[field])
+      if (a !== b) diffs.push({ field, incoming: a, existing: b })
+    }
+
+    const inContent = extractDataSpecificationContent(incoming)
+    const exContent = extractDataSpecificationContent(existing)
+
+    for (const field of ['dataType', 'unit', 'symbol', 'sourceOfDefinition', 'valueFormat']) {
+      const a = stringify(inContent?.[field])
+      const b = stringify(exContent?.[field])
+      if (a !== b) diffs.push({ field: `EDS.${field}`, incoming: a, existing: b })
+    }
+
+    for (const field of ['preferredName', 'shortName', 'definition']) {
+      const a = stringify(inContent?.[field])
+      const b = stringify(exContent?.[field])
+      if (a !== b) diffs.push({ field: `EDS.${field}`, incoming: a, existing: b })
+    }
+
+    return diffs
+  }
+
+  function openDiffDialog (row: ConceptDescriptionTableRow): void {
+    if (!('json' in row) || !('existingJson' in row)) return
+    diffRow.value = row as IecCdRow
+    diffDialogOpen.value = true
   }
 
   function downloadBlob (content: string, filename: string, mimeType: string): void {
