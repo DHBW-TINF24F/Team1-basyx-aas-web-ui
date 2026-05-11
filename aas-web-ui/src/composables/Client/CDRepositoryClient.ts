@@ -1,7 +1,9 @@
+import type { QueryParam } from '@/composables/UrlUtils'
 import type { types as aasTypes } from '@aas-core-works/aas-core3.1-typescript'
 import { jsonization } from '@aas-core-works/aas-core3.1-typescript'
 import { computed } from 'vue'
 import { useRequestHandling } from '@/composables/RequestHandling'
+import { addQueryParams } from '@/composables/UrlUtils'
 import { useInfrastructureStore } from '@/store/InfrastructureStore'
 import { base64Encode } from '@/utils/EncodeDecodeUtils'
 import { stripLastCharacter } from '@/utils/StringUtils'
@@ -25,7 +27,7 @@ export function useCDRepositoryClient () {
    * @returns {Promise<Array<any>>} A promise that resolves to an array of CDs.
    * An empty array is returned if the request fails or no CDs are found.
    */
-  async function fetchCdList (): Promise<Array<any>> {
+  async function fetchCdList (queryParams?: Array<QueryParam>): Promise<Array<any>> {
     const failResponse = [] as Array<any>
 
     if (conceptDescriptionRepoUrl.value.trim() === '') {
@@ -41,6 +43,9 @@ export function useCDRepositoryClient () {
     }
     if (!cdRepoUrl.endsWith(endpointPath)) {
       cdRepoUrl += endpointPath
+    }
+    if (queryParams && queryParams.length > 0) {
+      addQueryParams(cdRepoUrl, queryParams)
     }
 
     const cdRepoPath = cdRepoUrl

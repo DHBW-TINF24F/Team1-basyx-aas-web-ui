@@ -368,6 +368,158 @@ export function buildAttachmentSmePath (smEndpoint: string, idShortPath: string[
   return `${smEndpoint}/submodel-elements/${encodedPath}`
 }
 
+function parseEnvironmentText (environmentText: string, sourceLabel: string): JsonRecord {
+  const trimmedText = environmentText.trim()
+  if (trimmedText === '') {
+    throw new Error(`Environment content in '${sourceLabel}' is empty.`)
+  }
+
+  try {
+    const parsedJson = JSON.parse(trimmedText)
+    const environment = asRecord(parsedJson)
+    if (!environment) {
+      throw new Error(`Environment payload in '${sourceLabel}' is not an object.`)
+    }
+
+    return environment
+  } catch {
+    try {
+      const xmlEnvironment = deserializeXml(trimmedText)
+      const environment = aasCore.jsonization.toJsonable(xmlEnvironment as unknown as aasCore.types.Class)
+      const environmentRecord = asRecord(environment)
+      if (!environmentRecord) {
+        throw new Error(`Environment XML payload in '${sourceLabel}' is invalid.`)
+      }
+
+      return environmentRecord
+    } catch (xmlError) {
+      throw new Error(
+        `Failed to parse environment in '${sourceLabel}' as JSON or XML: ${stringifyUnknown(xmlError)}`,
+        {
+          cause: xmlError,
+        },
+      )
+    }
+  }
+}
+
+export type ExtractCdsResult = {
+  cdById: Map<string, { core: aasCore.types.ConceptDescription, json: JsonRecord, source: 'cd' | 'eds' }>
+  warnings: string[]
+}
+
+const IEC_IRI = 'https://admin-shell.io/DataSpecificationTemplates/DataSpecificationIEC61360/3/0'
+
+function collectEdsAsCds (
+  node: unknown,
+  result: Map<string, { core: aasCore.types.ConceptDescription, json: JsonRecord, source: 'eds' }>,
+  warnings: string[],
+  visited = new WeakSet<object>(),
+): void {
+  if (!node || typeof node !== 'object') {
+    return
+  }
+  if (visited.has(node as object)) {
+    return
+  }
+  visited.add(node as object)
+
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      collectEdsAsCds(item, result, warnings, visited)
+    }
+    return
+  }
+
+  const record = asRecord(node)
+  if (!record) {
+    return
+  }
+
+  const eds = asArray(record.embeddedDataSpecifications)
+  if (eds.length > 0) {
+    const semanticId = asRecord(record.semanticId)
+    const keys = semanticId ? asArray(semanticId.keys) : []
+    const idCandidate = keys.length > 0 ? asString(asRecord(keys[0])?.value ?? '').trim() : ''
+
+    if (idCandidate !== '') {
+      const iec360Eds = eds.filter(e => {
+        const spec = asRecord(asRecord(e)?.dataSpecification)
+        const specKeys = spec ? asArray(spec.keys) : []
+        return specKeys.some(k => asString(asRecord(k)?.value ?? '') === IEC_IRI)
+      })
+
+      if (iec360Eds.length > 0 && !result.has(idCandidate)) {
+        const cdJson: JsonRecord = {
+          modelType: 'ConceptDescription',
+          id: idCandidate,
+          embeddedDataSpecifications: iec360Eds,
+        }
+        try {
+          const parsed = parseConceptDescription(cdJson)
+          result.set(idCandidate, { core: parsed.core, json: parsed.json, source: 'eds' })
+        } catch (error) {
+          warnings.push(`Skipped EDS from element '${idCandidate}': ${stringifyUnknown(error)}`)
+        }
+      }
+    }
+  }
+
+  for (const value of Object.values(record)) {
+    collectEdsAsCds(value, result, warnings, visited)
+  }
+}
+
+export async function extractCdsFromAasx (file: File): Promise<ExtractCdsResult> {
+  const warnings: string[] = []
+  const cdById = new Map<string, { core: aasCore.types.ConceptDescription, json: JsonRecord, source: 'cd' | 'eds' }>()
+
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const packaging = NewPackaging()
+  const pkg = await packaging.OpenReadFromBytes(bytes)
+
+  try {
+    const specs = await pkg.Specs()
+    if (specs.length === 0) {
+      warnings.push(`No AAS environment spec found in '${file.name}'.`)
+      return { cdById, warnings }
+    }
+
+    for (const spec of specs) {
+      const environment = parseEnvironmentText(spec.ReadAllText(), `${file.name}:${spec.URI.pathname}`)
+      for (const cdEntry of asArray(environment.conceptDescriptions)) {
+        try {
+          const parsed = parseConceptDescription(cdEntry)
+          const id = asString(parsed.json.id).trim()
+          if (id !== '') {
+            cdById.set(id, { ...parsed, source: 'cd' })
+          }
+        } catch (error) {
+          warnings.push(`Skipped CD: ${stringifyUnknown(error)}`)
+        }
+      }
+    }
+
+    const edsMap = new Map<string, { core: aasCore.types.ConceptDescription, json: JsonRecord, source: 'eds' }>()
+    for (const spec of specs) {
+      const environment = parseEnvironmentText(spec.ReadAllText(), `${file.name}:${spec.URI.pathname}`)
+      for (const smEntry of asArray(environment.submodels)) {
+        collectEdsAsCds(smEntry, edsMap, warnings)
+      }
+    }
+
+    for (const [id, entry] of edsMap) {
+      if (!cdById.has(id)) {
+        cdById.set(id, entry)
+      }
+    }
+  } finally {
+    pkg.Close()
+  }
+
+  return { cdById, warnings }
+}
+
 export function useAASXImport (): {
   importAasxFileClient: (file: File) => Promise<ClientAASXImportResult>
   importEnvironmentFileClient: (file: File) => Promise<ClientAASXImportResult>
@@ -377,40 +529,8 @@ export function useAASXImport (): {
   const { postConceptDescription, putConceptDescription } = useCDRepositoryClient()
   const { determineContentType } = useSMEFile()
 
-  function parseEnvironmentText (environmentText: string, sourceLabel: string): JsonRecord {
-    const trimmedText = environmentText.trim()
-    if (trimmedText === '') {
-      throw new Error(`Environment content in '${sourceLabel}' is empty.`)
-    }
-
-    try {
-      const parsedJson = JSON.parse(trimmedText)
-      const environment = asRecord(parsedJson)
-      if (!environment) {
-        throw new Error(`Environment payload in '${sourceLabel}' is not an object.`)
-      }
-
-      return environment
-    } catch {
-      try {
-        const xmlEnvironment = deserializeXml(trimmedText)
-        const environment = aasCore.jsonization.toJsonable(xmlEnvironment as unknown as aasCore.types.Class)
-        const environmentRecord = asRecord(environment)
-        if (!environmentRecord) {
-          throw new Error(`Environment XML payload in '${sourceLabel}' is invalid.`)
-        }
-
-        return environmentRecord
-      } catch (xmlError) {
-        throw new Error(
-          `Failed to parse environment in '${sourceLabel}' as JSON or XML: ${stringifyUnknown(xmlError)}`,
-          {
-            cause: xmlError,
-          },
-        )
-      }
-    }
-  }
+  // parseEnvironmentText is defined at module scope so it can be shared
+  // with the standalone extractCdsFromAasx export.
 
   function collectEnvironmentEntries (
     environment: JsonRecord,
