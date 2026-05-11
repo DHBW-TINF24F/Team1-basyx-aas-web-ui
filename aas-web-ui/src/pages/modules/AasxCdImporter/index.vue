@@ -78,74 +78,12 @@
           <v-chip class="ml-1" color="warning" size="small">{{ existsCount }} ALREADY EXISTS</v-chip>
         </v-alert>
 
-        <!-- Zone 5: CD Preview Table -->
-        <v-data-table
+        <ConceptDescriptionTableView
           v-if="cdRows.length > 0"
-          class="border rounded-lg mb-4"
-          density="compact"
-          :headers="tableHeaders"
-          hover
-          :items="cdRows"
-          :items-per-page="25"
-        >
-
-          <template #[`header.selected`]>
-            <v-checkbox-btn
-              :indeterminate="someSelected"
-              :model-value="allSelected"
-              @update:model-value="toggleSelectAll"
-            />
-          </template>
-
-          <template #[`item.selected`]="{ item }">
-            <v-checkbox-btn
-              v-model="item.selected"
-              @click.stop
-            />
-          </template>
-
-          <template #[`item.source`]="{ item }">
-            <v-chip
-              :color="item.source === 'cd' ? 'primary' : 'secondary'"
-              size="small"
-              variant="tonal"
-            >
-              {{ item.source === 'cd' ? 'CD' : 'EDS' }}
-            </v-chip>
-          </template>
-
-          <template #[`item.status`]="{ item }">
-            <v-chip
-              :color="item.status === 'new' ? 'success' : 'warning'"
-              size="small"
-              variant="tonal"
-            >
-              {{ item.status === 'new' ? 'NEW' : 'EXISTS' }}
-            </v-chip>
-          </template>
-
-          <template #[`item.diff`]="{ item }">
-            <v-btn
-              v-if="item.status === 'exists'"
-              color="warning"
-              prepend-icon="mdi-compare"
-              size="x-small"
-              variant="tonal"
-              @click.stop="openDiffDialog(item)"
-            >
-              View Diff
-            </v-btn>
-          </template>
-
-          <template #[`item.preferredName`]="{ item }">
-            <span v-if="item.preferredName" class="text-body-2">{{ item.preferredName }}</span>
-            <span v-else class="text-medium-emphasis text-caption font-italic">—</span>
-          </template>
-
-          <template #[`item.id`]="{ item }">
-            <span class="text-caption text-mono">{{ item.id }}</span>
-          </template>
-        </v-data-table>
+          class="mb-4"
+          :rows="cdRows"
+          @view-diff="openDiffDialog"
+        />
 
         <!-- Zone 6: Import Button -->
         <v-btn
@@ -302,6 +240,8 @@
   import { extractCdsFromAasx } from '@/composables/AAS/AASXImport'
   import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient'
   import { useNavigationStore } from '@/store/NavigationStore'
+  import ConceptDescriptionTableView from '@/components/UIComponents/ConceptDescriptionTableView.vue'
+  import type { ConceptDescriptionTableRow } from '@/types/ConceptDescriptionTable'
 
   defineOptions({
     inheritAttrs: false,
@@ -316,15 +256,8 @@
 
   // --- Local Types ---
   type JsonRecord = Record<string, unknown>
-  type CdStatus = 'new' | 'exists'
-  type CdSource = 'cd' | 'eds'
   type Phase = 'idle' | 'scanning' | 'ready' | 'importing' | 'done'
-  type CdRow = {
-    id: string
-    preferredName: string
-    status: CdStatus
-    source: CdSource
-    selected: boolean
+  type CdRow = ConceptDescriptionTableRow & {
     core: aasCore.types.ConceptDescription
     json: JsonRecord
     existingJson: JsonRecord | null
@@ -343,16 +276,6 @@
   const diffRow = ref<CdRow | null>(null)
   const importSummary = ref<ImportSummary | null>(null)
   const importErrors = ref<string[]>([])
-
-  // --- Table Headers ---
-  const tableHeaders = [
-    { title: '', key: 'selected', sortable: false, width: '48px' },
-    { title: 'Source', key: 'source', sortable: true, width: '100px' },
-    { title: 'Status', key: 'status', sortable: true, width: '110px' },
-    { title: '', key: 'diff', sortable: false, width: '110px' },
-    { title: 'Preferred Name', key: 'preferredName', sortable: true },
-    { title: 'ID', key: 'id', sortable: true },
-  ]
 
   // --- Computed ---
   const selectedFile = computed<File | null>(() => aasxFiles.value[0] ?? null)
@@ -373,28 +296,49 @@
 
   const edsCount = computed<number>(() => cdRows.value.filter(r => r.source === 'eds').length)
 
-  const allSelected = computed<boolean>(
-    () => cdRows.value.length > 0 && cdRows.value.every(r => r.selected),
-  )
-
-  const someSelected = computed<boolean>(
-    () => cdRows.value.some(r => r.selected) && !allSelected.value,
-  )
-
   // --- Helpers ---
+  function extractDataSpecificationContent (json: JsonRecord): JsonRecord | null {
+    const eds = Array.isArray(json.embeddedDataSpecifications) ? json.embeddedDataSpecifications : []
+    if (eds.length === 0) return null
+    return ((eds[0] as any)?.dataSpecificationContent ?? null) as JsonRecord | null
+  }
+
+  function extractLangString (value: unknown): string {
+    if (!Array.isArray(value) || value.length === 0) return ''
+    const en = value.find((entry: any) => String(entry?.language ?? '').toLowerCase().startsWith('en'))
+    return String(((en ?? value[0]) as any)?.text ?? '')
+  }
+
   function extractPreferredName (json: JsonRecord): string {
     try {
-      const eds = json.embeddedDataSpecifications
-      if (!Array.isArray(eds) || eds.length === 0) return ''
-      const content = (eds[0] as any)?.dataSpecificationContent
-      if (!content) return ''
-      const preferredNames: any[] = Array.isArray(content.preferredName) ? content.preferredName : []
-      if (preferredNames.length === 0) return ''
-      const en = preferredNames.find((p: any) => String(p.language ?? '').toLowerCase().startsWith('en'))
-      return String((en ?? preferredNames[0])?.text ?? '')
+      return extractLangString(extractDataSpecificationContent(json)?.preferredName)
+        || extractLangString(json.displayName)
     } catch {
       return ''
     }
+  }
+
+  function extractShortName (json: JsonRecord): string {
+    try {
+      return extractLangString(extractDataSpecificationContent(json)?.shortName)
+        || String(json.idShort ?? '')
+    } catch {
+      return ''
+    }
+  }
+
+  function extractDefinition (json: JsonRecord): string {
+    try {
+      return extractLangString(extractDataSpecificationContent(json)?.definition)
+        || extractLangString(json.description)
+    } catch {
+      return ''
+    }
+  }
+
+  function extractContentString (json: JsonRecord, field: string): string {
+    const value = extractDataSpecificationContent(json)?.[field]
+    return value === undefined || value === null ? '' : String(value)
   }
 
   function computeCdDiff (incoming: JsonRecord, existing: JsonRecord): DiffEntry[] {
@@ -418,14 +362,8 @@
       if (a !== b) diffs.push({ field, incoming: a, existing: b })
     }
 
-    const getContent = (json: JsonRecord): JsonRecord | null => {
-      const eds = Array.isArray(json.embeddedDataSpecifications) ? json.embeddedDataSpecifications : []
-      if (eds.length === 0) return null
-      return (eds[0] as any)?.dataSpecificationContent ?? null
-    }
-
-    const inContent = getContent(incoming)
-    const exContent = getContent(existing)
+    const inContent = extractDataSpecificationContent(incoming)
+    const exContent = extractDataSpecificationContent(existing)
 
     for (const field of ['dataType', 'unit', 'symbol', 'sourceOfDefinition', 'valueFormat']) {
       const a = stringify(inContent?.[field])
@@ -481,7 +419,12 @@
       // Step 3: Build table rows with status, source and existing data
       cdRows.value = Array.from(cdById.entries()).map(([id, { core, json, source }]) => ({
         id,
+        irdi: id,
         preferredName: extractPreferredName(json),
+        shortName: extractShortName(json),
+        definition: extractDefinition(json),
+        unit: extractContentString(json, 'unit'),
+        dataType: extractContentString(json, 'dataType'),
         status: existingById.has(id) ? 'exists' : 'new',
         source,
         selected: true,
@@ -506,8 +449,9 @@
     }
   }
 
-  function openDiffDialog (row: CdRow): void {
-    diffRow.value = row
+  function openDiffDialog (row: ConceptDescriptionTableRow): void {
+    if (!('json' in row) || !('existingJson' in row)) return
+    diffRow.value = row as CdRow
     diffDialogOpen.value = true
   }
 
@@ -569,10 +513,6 @@
       text: `Import complete: ${succeeded}/${toImport.length} Concept Description(s) imported successfully`,
       extendedError: failed > 0 ? importErrors.value.join('\n') : undefined,
     })
-  }
-
-  function toggleSelectAll (value: boolean): void {
-    for (const r of cdRows.value) (r.selected = value)
   }
 
   function resetModule (): void {
