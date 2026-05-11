@@ -172,6 +172,7 @@
           v-if="validationResult && validationResult.isValid"
           class="mb-3"
           :rows="conceptDescriptionRows"
+          :show-source="false"
         />
 
         <!-- Save to CD Repository -->
@@ -231,7 +232,7 @@
   import type { ConceptDescriptionTableRow } from '@/types/ConceptDescriptionTable'
   import type { IecCddProperty, IecCddValidationResult } from '@/types/IecCdd'
   import { jsonization } from '@aas-core-works/aas-core3.1-typescript'
-  import { computed, ref } from 'vue'
+  import { ref } from 'vue'
   import ConceptDescriptionTableView from '@/components/UIComponents/ConceptDescriptionTableView.vue'
   import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient'
   import { useIecFileImport } from '@/composables/IecFileImport'
@@ -245,7 +246,9 @@
   const navigationStore = useNavigationStore()
   const infrastructureStore = useInfrastructureStore()
   const { importFileContent } = useIecFileImport()
-  const { postConceptDescription, putConceptDescription, isAvailableByIdInRepo } = useCDRepositoryClient()
+  const { fetchCdList, postConceptDescription, putConceptDescription } = useCDRepositoryClient()
+
+  type IecCdRow = ConceptDescriptionTableRow & { property: IecCddProperty }
 
   const datasetLoading = ref<boolean>(false)
   const savingCds = ref<boolean>(false)
@@ -255,21 +258,7 @@
   const fileInputRef = ref<HTMLInputElement | null>(null)
   const saveResultMessage = ref<string>('')
   const saveResultType = ref<'success' | 'error' | 'info'>('success')
-
-  const conceptDescriptionRows = computed<ConceptDescriptionTableRow[]>(() =>
-    validationResult.value?.properties.map(property => ({
-      id: property.irdi,
-      irdi: property.irdi,
-      preferredName: property.preferredName,
-      shortName: property.shortName ?? '',
-      definition: property.definition ?? '',
-      unit: property.unit ?? '',
-      dataType: property.dataType ?? '',
-      selected: true,
-      source: 'eds',
-      status: 'new',
-    })) ?? [],
-  )
+  const conceptDescriptionRows = ref<IecCdRow[]>([])
 
   function triggerFileInput (): void {
     fileInputRef.value?.click()
@@ -281,6 +270,7 @@
     if (!files || files.length === 0) return
 
     datasetLoading.value = true
+    conceptDescriptionRows.value = []
     const allProperties: IecCddProperty[] = []
     const allResults: Array<{ metadata: { detectedFormat: string }, payload: unknown, validation: IecCddValidationResult }> = []
     const formats = new Set<string>()
@@ -314,6 +304,32 @@
         errors: failedFiles.map(f => `Import failed: ${f}`),
         warnings,
       }
+
+      const existingIds = new Set<string>()
+      if (allProperties.length > 0) {
+        try {
+          const existingCds = await fetchCdList()
+          for (const cd of existingCds) {
+            const id = String(cd?.id ?? '').trim()
+            if (id !== '') existingIds.add(id)
+          }
+        } catch {
+          warnings.push('Could not fetch existing CDs from repository — all properties will be treated as NEW.')
+        }
+      }
+
+      conceptDescriptionRows.value = allProperties.map(property => ({
+        id: property.irdi,
+        irdi: property.irdi,
+        preferredName: property.preferredName,
+        shortName: property.shortName ?? '',
+        definition: property.definition ?? '',
+        unit: property.unit ?? '',
+        dataType: property.dataType ?? '',
+        selected: true,
+        status: existingIds.has(property.irdi) ? 'exists' : 'new',
+        property,
+      }))
 
       const totalProps = allProperties.length
       const successCount = allResults.length
@@ -381,6 +397,13 @@
   async function saveAsConceptDescriptions (): Promise<void> {
     if (!validationResult.value || !validationResult.value.isValid) return
 
+    const selectedRows = conceptDescriptionRows.value.filter(row => row.selected)
+    if (selectedRows.length === 0) {
+      saveResultType.value = 'info'
+      saveResultMessage.value = 'No Concept Descriptions selected.'
+      return
+    }
+
     const cdRepoUrl = infrastructureStore.getConceptDescriptionRepoURL
     if (!cdRepoUrl || cdRepoUrl.trim() === '') {
       saveResultType.value = 'error'
@@ -395,21 +418,20 @@
     let failed = 0
 
     try {
-      for (const property of validationResult.value.properties) {
-        const cdJson = buildConceptDescription(property)
+      for (const row of selectedRows) {
+        const cdJson = buildConceptDescription(row.property)
         const cdResult = jsonization.conceptDescriptionFromJsonable(cdJson)
 
         if (cdResult.error !== null) {
-          console.warn('Failed to deserialize CD for IRDI', property.irdi, cdResult.error)
+          console.warn('Failed to deserialize CD for IRDI', row.property.irdi, cdResult.error)
           failed++
           continue
         }
 
         const cd = cdResult.mustValue()
-        const exists = await isAvailableByIdInRepo(property.irdi)
 
         let success
-        if (exists) {
+        if (row.status === 'exists') {
           success = await putConceptDescription(cd)
           if (success) updated++
           else failed++
