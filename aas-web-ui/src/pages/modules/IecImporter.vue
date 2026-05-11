@@ -168,27 +168,11 @@
         </v-alert>
 
         <!-- Structured Properties Table -->
-        <v-card v-if="validationResult && validationResult.isValid" class="mb-3" variant="outlined">
-          <v-card-title class="text-subtitle-1">IEC-CDD Properties</v-card-title>
-          <v-card-text>
-            <v-text-field
-              v-model="tableSearch"
-              class="mb-2"
-              clearable
-              density="compact"
-              label="Search properties..."
-              prepend-inner-icon="mdi-magnify"
-              variant="outlined"
-            />
-            <v-data-table
-              density="compact"
-              :headers="propertyTableHeaders"
-              :items="validationResult.properties"
-              items-per-page="10"
-              :search="tableSearch"
-            />
-          </v-card-text>
-        </v-card>
+        <ConceptDescriptionTableView
+          v-if="validationResult && validationResult.isValid"
+          class="mb-3"
+          :rows="conceptDescriptionRows"
+        />
 
         <!-- Save to CD Repository -->
         <v-btn
@@ -244,9 +228,11 @@
 </template>
 
 <script setup lang="ts">
+  import type { ConceptDescriptionTableRow } from '@/types/ConceptDescriptionTable'
   import type { IecCddProperty, IecCddValidationResult } from '@/types/IecCdd'
   import { jsonization } from '@aas-core-works/aas-core3.1-typescript'
-  import { ref } from 'vue'
+  import { computed, ref } from 'vue'
+  import ConceptDescriptionTableView from '@/components/UIComponents/ConceptDescriptionTableView.vue'
   import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient'
   import { useIecFileImport } from '@/composables/IecFileImport'
   import { useInfrastructureStore } from '@/store/InfrastructureStore'
@@ -266,19 +252,24 @@
   const importedDatasetJsonPreview = ref<string>('')
   const importedDatasetFormat = ref<string>('')
   const validationResult = ref<IecCddValidationResult | null>(null)
-  const tableSearch = ref<string>('')
   const fileInputRef = ref<HTMLInputElement | null>(null)
   const saveResultMessage = ref<string>('')
   const saveResultType = ref<'success' | 'error' | 'info'>('success')
 
-  const propertyTableHeaders = [
-    { title: 'IRDI', key: 'irdi', sortable: true },
-    { title: 'Preferred Name', key: 'preferredName', sortable: true },
-    { title: 'Short Name', key: 'shortName', sortable: true },
-    { title: 'Definition', key: 'definition', sortable: false },
-    { title: 'Unit', key: 'unit', sortable: true },
-    { title: 'Data Type', key: 'dataType', sortable: true },
-  ]
+  const conceptDescriptionRows = computed<ConceptDescriptionTableRow[]>(() =>
+    validationResult.value?.properties.map(property => ({
+      id: property.irdi,
+      irdi: property.irdi,
+      preferredName: property.preferredName,
+      shortName: property.shortName ?? '',
+      definition: property.definition ?? '',
+      unit: property.unit ?? '',
+      dataType: property.dataType ?? '',
+      selected: true,
+      source: 'eds',
+      status: 'new',
+    })) ?? [],
+  )
 
   function triggerFileInput (): void {
     fileInputRef.value?.click()
