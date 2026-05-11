@@ -5,100 +5,6 @@
       <v-card-subtitle class="text-center pb-2">Import local Excel files (multiple selection supported)</v-card-subtitle>
       <v-divider />
       <v-card-text>
-        <!-- Tutorial: How to export Excel files from IEC CDD -->
-        <v-expansion-panels class="mb-3">
-          <v-expansion-panel>
-            <v-expansion-panel-title>
-              <template #default="{ expanded }">
-                <div class="d-flex align-center">
-                  <v-icon class="mr-2" icon="mdi-help-circle-outline" />
-                  <span>How to export Excel files of a property or class from IEC CDD</span>
-                </div>
-                <v-spacer />
-              </template>
-            </v-expansion-panel-title>
-            <v-expansion-panel-text>
-              <v-alert class="mb-3" density="compact" type="success" variant="tonal">
-                <strong>No account required:</strong> the IEC CDD lets you browse and
-                export Excel files directly — there is no login, sign-up or paywall
-                for the steps below.
-              </v-alert>
-              <ol class="tutorial-list">
-                <li class="mb-2">
-                  Open the IEC Common Data Dictionary at
-                  <a href="https://cdd.iec.ch" rel="noopener" target="_blank">cdd.iec.ch</a>.
-                  Use the tree navigation on the left or the search bar at the top
-                  right to locate the desired <strong>class</strong> or
-                  <strong>property</strong>, then click it to open the detail view.
-                  You should see the metadata table (<code>code</code>,
-                  <code>preferred name</code>, <code>definition</code>,
-                  <code>primary unit</code>, <code>data type</code>, …) and four
-                  orange action buttons above it.
-                </li>
-                <li class="mb-2">
-                  Click the orange <strong>Export</strong> button in the toolbar
-                  above the metadata table.
-                  <div class="tutorial-figure my-2">
-                    <img
-                      alt="IEC CDD detail view with Export button highlighted"
-                      class="tutorial-img"
-                      src="@/assets/Tutorials/IecCdd/01-detail-view.png"
-                    >
-                  </div>
-                </li>
-                <li class="mb-2">
-                  In the dropdown that appears, choose what to export:
-                  <ul class="mt-1">
-                    <li><strong>Attributes</strong> — the metadata of the selected class itself.</li>
-                    <li><strong>Properties</strong> — all properties of the selected class as rows.</li>
-                    <li><strong>All</strong> — attributes and properties combined.</li>
-                  </ul>
-                  Pick the option that matches what you want to import.
-                  <div class="tutorial-figure my-2">
-                    <img
-                      alt="IEC CDD Export dropdown with Attributes, Properties and All"
-                      class="tutorial-img tutorial-img--narrow"
-                      src="@/assets/Tutorials/IecCdd/02-export-menu.png"
-                    >
-                  </div>
-                </li>
-                <li class="mb-2">
-                  A download page opens with the green Excel icon. Click
-                  <strong>Download</strong> to save the <code>.xlsx</code> file
-                  straight to your downloads folder — no login prompt appears.
-                  <div class="tutorial-figure my-2">
-                    <img
-                      alt="IEC CDD download page with Excel icon and Download link"
-                      class="tutorial-img"
-                      src="@/assets/Tutorials/IecCdd/03-download-page.png"
-                    >
-                  </div>
-                </li>
-                <li>
-                  Come back here, click <em>Upload files</em> below and select the
-                  downloaded Excel file (or several files at once) to import.
-                </li>
-              </ol>
-              <v-alert class="mt-3" density="compact" type="info" variant="tonal">
-                <strong>Tip:</strong> The importer auto-detects the IEC-CDD header row
-                (e.g. <code>#property_name</code>, <code>code</code>, <code>preferredname</code>,
-                <code>primaryunit</code>, <code>data_type</code>). Custom Excel layouts that
-                do not contain these columns will not be recognised as IEC-CDD properties.
-              </v-alert>
-            </v-expansion-panel-text>
-          </v-expansion-panel>
-        </v-expansion-panels>
-
-        <!-- Info Alerts -->
-        <v-alert class="mb-3" density="compact" type="info" variant="tonal">
-          The IEC Importer only supports import via file upload. Download IEC-CDD datasets as Excel files and
-          upload them here. You can select multiple files at once.
-        </v-alert>
-
-        <v-alert class="mb-3" density="compact" type="info" variant="tonal">
-          Supported formats: XLSX/XLS (Excel), as well as JSON, XML, CSV and YAML.
-        </v-alert>
-
         <!-- File Upload Button -->
         <v-btn
           block
@@ -118,6 +24,16 @@
           type="file"
           @change="handleFileUpload"
         >
+
+        <!-- Info Alerts -->
+        <v-alert class="mb-3" density="compact" type="info" variant="tonal">
+          The IEC Importer only supports import via file upload. Download IEC-CDD datasets as Excel files and
+          upload them here. You can select multiple files at once.
+        </v-alert>
+
+        <v-alert class="mb-3" density="compact" type="info" variant="tonal">
+          Supported formats: XLSX/XLS (Excel), as well as JSON, XML, CSV and YAML.
+        </v-alert>
 
         <!-- Format Detection -->
         <v-alert
@@ -474,24 +390,3 @@
     URL.revokeObjectURL(objectUrl)
   }
 </script>
-
-<style scoped>
-.tutorial-figure {
-  display: flex;
-  justify-content: flex-start;
-}
-
-.tutorial-img {
-  max-width: 100%;
-  width: 100%;
-  height: auto;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.tutorial-img--narrow {
-  max-width: 220px;
-  width: auto;
-}
-</style>
