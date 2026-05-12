@@ -106,6 +106,37 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
     })
   })
 
+	function getUnit(item: any): string {
+		for (const embeddedSpec in item.embeddedDataSpecifications) {
+      const spec = item.embeddedDataSpecifications[embeddedSpec]
+      if (spec.dataSpecificationContent && spec.dataSpecificationContent.unit) {
+        return spec.dataSpecificationContent.unit
+      }
+    }
+		return ''
+	}
+
+	function getDefinition(item: any): string {
+		for (const embeddedSpec in item.embeddedDataSpecifications) {
+      const spec = item.embeddedDataSpecifications[embeddedSpec]
+      if (spec.dataSpecificationContent && spec.dataSpecificationContent.definition) {
+        const definitions = spec.dataSpecificationContent.definition
+        
+        if (!Array.isArray(definitions)) return ''
+        
+        const enDef = definitions.find((def: any) => def.language === 'en')
+        if (enDef?.text) {
+          return enDef.text
+        }
+
+        if (definitions.length > 0 && definitions[0]?.text) {
+          return definitions[0].text
+        }
+      }
+    }
+    return ''
+	}
+
   function handleRowClick (_event: MouseEvent, { item }: { item: any }): void {
     const itemId = item.id
     const index = expandedRows.value.indexOf(itemId)
@@ -137,36 +168,6 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
     return `${text.slice(0, maxLength - 1)}…`
   }
 
-	function getUnit(item: any): string {
-		for (const embeddedSpec in item.embeddedDataSpecifications) {
-      const spec = item.embeddedDataSpecifications[embeddedSpec]
-      if (spec.dataSpecificationContent && spec.dataSpecificationContent.unit) {
-        return spec.dataSpecificationContent.unit
-      }
-    }
-		return ''
-	}
-
-	function getDefinition(item: any): string {
-		for (const embeddedSpec in item.embeddedDataSpecifications) {
-      const spec = item.embeddedDataSpecifications[embeddedSpec]
-      if (spec.dataSpecificationContent && spec.dataSpecificationContent.definition) {
-        const definitions = spec.dataSpecificationContent.definition
-        
-        if (!Array.isArray(definitions)) return ''
-        
-        const enDef = definitions.find((def: any) => def.language === 'en')
-        if (enDef?.text) {
-          return enDef.text
-        }
-
-        if (definitions.length > 0 && definitions[0]?.text) {
-          return definitions[0].text
-        }
-      }
-    }
-    return ''
-	}
 
 </script>
 
