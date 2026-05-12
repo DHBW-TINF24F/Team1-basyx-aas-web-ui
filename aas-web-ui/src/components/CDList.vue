@@ -33,6 +33,28 @@
         <span class="text-truncate d-inline-block cd-preview">{{ truncateText(item.id, 80) }}</span>
       </template>
 
+      <template #[`item.actions`]="{ item }">
+        <v-menu>
+          <template #activator="{ props }">
+            <v-btn
+              v-bind="props"
+              icon="mdi-dots-vertical"
+              variant="text"
+              size="small"
+              @click.stop
+            />
+          </template>
+          <v-list>
+            <v-list-item @click="toggleRowExpansion(item.id)">
+              <template #prepend>
+                <v-icon>{{ isRowExpanded(item.id) ? 'mdi-eye-off' : 'mdi-eye' }}</v-icon>
+              </template>
+              <v-list-item-title>{{ isRowExpanded(item.id) ? 'Collapse' : 'Expand' }}</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+      </template>
+
       <template #expanded-row="{ columns, item }">
         <tr>
           <td :colspan="columns.length" class="px-0 py-0">
@@ -78,6 +100,7 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
 		{ title: 'Unit', key: 'unit', width: '1fr' },
 		{ title: 'Definition', key: 'definition', width: '5fr' },
     { title: 'ID', key: 'id', width: '2fr' },
+    { title: '', key: 'actions', width: '48px', sortable: false },
 	]
 
 	onMounted(async () => {
@@ -155,6 +178,19 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
     }
   }
 
+  function isRowExpanded(itemId: string): boolean {
+    return expandedRows.value.includes(itemId)
+  }
+
+  function toggleRowExpansion(itemId: string): void {
+    const index = expandedRows.value.indexOf(itemId)
+    if (index === -1) {
+      expandedRows.value = [itemId]
+    } else {
+      expandedRows.value = expandedRows.value.filter((id) => id !== itemId)
+    }
+  }
+
   function truncateText(value: unknown, maxLength = 40): string {
     if (value === undefined || value === null) {
       return '—'
@@ -187,5 +223,10 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
 .cd-preview {
   max-width: 100%;
   vertical-align: bottom;
+}
+
+.cd-list-table :deep([data-test="data-table-select"]),
+.cd-list-table :deep(td:last-child) {
+  padding: 0 4px !important;
 }
 </style>
