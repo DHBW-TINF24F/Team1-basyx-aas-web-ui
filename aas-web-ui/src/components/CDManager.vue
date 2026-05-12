@@ -174,7 +174,10 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
 
   function getRowProps ({ item }: { item: any }): Record<string, any> {
     return {
-      class: 'cursor-pointer',
+      class: [
+        'cursor-pointer',
+        isRowExpanded(item.id) ? 'expanded-row-highlight' : ''
+      ],
     }
   }
 
@@ -228,5 +231,9 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
 .cd-list-table :deep([data-test="data-table-select"]),
 .cd-list-table :deep(td:last-child) {
   padding: 0 4px !important;
+}
+
+.cd-list-table :deep(.expanded-row-highlight) {
+  background-color: rgba(var(--v-theme-primary), 0.08) !important;
 }
 </style>
