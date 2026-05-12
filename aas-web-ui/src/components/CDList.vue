@@ -8,7 +8,58 @@
       label="Type to search for specific ConceptDescriptions..."
       variant="outlined"
     />
-    <v-data-table :headers="headers" :items="filteredData"></v-data-table>
+    <v-data-table
+      class="cd-list-table"
+      v-model:expanded="expandedRows"
+      :headers="headers"
+      :items="filteredData"
+      item-value="id"
+      :row-props="getRowProps"
+      @click:row="handleRowClick"
+    >
+      <template #[`item.idShort`]="{ item }">
+        <span class="text-truncate d-inline-block cd-preview">{{ truncateText(item.idShort) }}</span>
+      </template>
+
+      <template #[`item.unit`]="{ item }">
+        <span class="text-truncate d-inline-block cd-preview">{{ truncateText(item.unit) }}</span>
+      </template>
+
+      <template #[`item.definition`]="{ item }">
+        <span class="text-truncate d-inline-block cd-preview">{{ truncateText(item.definition, 120) }}</span>
+      </template>
+
+      <template #[`item.id`]="{ item }">
+        <span class="text-truncate d-inline-block cd-preview">{{ truncateText(item.id, 80) }}</span>
+      </template>
+
+      <template #expanded-row="{ columns, item }">
+        <tr>
+          <td :colspan="columns.length" class="px-0 py-0">
+            <v-card flat class="pa-4 bg-surface">
+              <v-row dense>
+                <v-col cols="12" md="6">
+                  <div class="text-caption text-medium-emphasis">ID Short</div>
+                  <div class="text-body-2 text-break">{{ item.idShort || '—' }}</div>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <div class="text-caption text-medium-emphasis">Unit</div>
+                  <div class="text-body-2 text-break">{{ item.unit || '—' }}</div>
+                </v-col>
+                <v-col cols="12">
+                  <div class="text-caption text-medium-emphasis">Definition</div>
+                  <div class="text-body-2 text-break">{{ item.definition || '—' }}</div>
+                </v-col>
+                <v-col cols="12">
+                  <div class="text-caption text-medium-emphasis">ID</div>
+                  <div class="text-body-2 text-break">{{ item.id || '—' }}</div>
+                </v-col>
+              </v-row>
+            </v-card>
+          </td>
+        </tr>
+      </template>
+    </v-data-table>
   </v-container>
 </template>
 
@@ -20,6 +71,7 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
   const cdRepoClient = useCDRepositoryClient()
   const cdData = ref<any[]>([])
   const search = ref('')
+  const expandedRows = ref<string[]>([])
 
   const headers = [
 		{ title: 'ID Short', key: 'idShort', width: '1fr' },
@@ -54,6 +106,37 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
     })
   })
 
+  function handleRowClick (_event: MouseEvent, { item }: { item: any }): void {
+    const itemId = item.id
+    const index = expandedRows.value.indexOf(itemId)
+
+    if (index === -1) {
+      expandedRows.value = [itemId]
+      return
+    }
+
+    expandedRows.value = expandedRows.value.filter((expandedId) => expandedId !== itemId)
+  }
+
+  function getRowProps ({ item }: { item: any }): Record<string, any> {
+    return {
+      class: 'cursor-pointer',
+    }
+  }
+
+  function truncateText(value: unknown, maxLength = 40): string {
+    if (value === undefined || value === null) {
+      return '—'
+    }
+
+    const text = String(value)
+    if (text.length <= maxLength) {
+      return text
+    }
+
+    return `${text.slice(0, maxLength - 1)}…`
+  }
+
 	function getUnit(item: any): string {
 		for (const embeddedSpec in item.embeddedDataSpecifications) {
       const spec = item.embeddedDataSpecifications[embeddedSpec]
@@ -86,3 +169,22 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
 	}
 
 </script>
+
+<style scoped>
+.cd-list-table {
+  width: 100%;
+}
+
+.cd-list-table :deep(.v-table__wrapper) {
+  overflow-y: visible;
+}
+
+.cd-list-table :deep(table) {
+  table-layout: fixed;
+}
+
+.cd-preview {
+  max-width: 100%;
+  vertical-align: bottom;
+}
+</style>
