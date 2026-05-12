@@ -48,7 +48,7 @@
           <SubmodelElementVisualization v-else-if="componentToShow === 'Visualization'" />
           <SubmodelElementJSONView v-if="componentToShow === 'JSONView'" />
         </template>
-        <CDList v-else-if="componentToShow === 'CDList'" />
+        <CDList v-if="componentToShow === 'CDList'" />
         <v-empty-state
           v-else-if="
             !['SMViewer', 'SMEditor'].includes(route.name as string) &&
