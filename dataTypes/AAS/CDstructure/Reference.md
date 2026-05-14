@@ -1,0 +1,3 @@
+- type -> [ReferenceTypes](./ReferenceTypes.md)
+- referredSemanticId -> [Reference](./Reference.md)
+- key (ordered) -> [Key](./Key.md)

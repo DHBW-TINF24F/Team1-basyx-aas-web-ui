@@ -1,0 +1,3 @@
+- string with max 2048 and min 1 characters
+- Note: For Identifier it is recommended to use existing standards, for example ID-Link (IEC 61406) may be used for the [globalAssetId](https://industrialdigitaltwin.io/aas-specifications/IDTA-01001/v3.2/spec-metamodel/core.html#AssetInformation). Typically, identifier strings do not contain blanks, emoticons or carriage returns because they are not representable in existing systems.
+- Examlpe value: https://cust/1234560173-1#02-BAA120#008

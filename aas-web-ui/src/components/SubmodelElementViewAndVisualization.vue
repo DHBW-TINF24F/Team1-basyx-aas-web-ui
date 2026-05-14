@@ -72,6 +72,7 @@
   import { computed, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import { useAASStore } from '@/store/AASDataStore'
+  import CDEdit from './CDEditorView.vue'
 
   // Vue Router
   const route = useRoute()

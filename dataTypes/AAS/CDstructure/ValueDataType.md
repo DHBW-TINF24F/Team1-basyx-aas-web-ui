@@ -1,0 +1,1 @@
+any xsd atomic type as specified via [DataTypeDefXsd](./DataTypeDefXsd.md)

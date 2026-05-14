@@ -1,0 +1,4 @@
+- category (Deprecated) -> [NameType](./NameType.md)
+- idShort -> [NameType](./NameType.md)
+- displayName -> [MultiLanguageNameType](./MultiLanguageNameType.md)
+- description -> [MultiLanguageTextType](./MultiLanguageTextType.md)

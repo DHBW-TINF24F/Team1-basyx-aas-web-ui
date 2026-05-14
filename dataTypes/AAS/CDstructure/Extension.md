@@ -1,0 +1,4 @@
+- name -> [NameType](./NameType.md)
+- valueType -> [DataTypeDefXsd](./DataTypeDefXsd.md)
+- value -> [ValueDataType](./ValueDataType.md)
+- refersTo -> ModelReference([Referable](./Referable.md)) #CheckIfRelevant
