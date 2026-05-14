@@ -72,7 +72,7 @@ export function addQueryParams (url: string, queryParams: Array<QueryParam>): st
   let queryParamString = ''
   for (const queryParam of queryParams) {
     const paramDelimiter = queryParamString.length > 0 ? '&' : '?'
-    queryParamString += paramDelimiter + queryParam.key + '=' + queryParam.value
+    queryParamString += paramDelimiter + encodeURIComponent(queryParam.key) + '=' + encodeURIComponent(queryParam.value)
   }
 
   return url + queryParamString

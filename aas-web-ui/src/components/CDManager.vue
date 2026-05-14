@@ -1,10 +1,44 @@
 <template>
   <v-container fluid class="pa-0">
+    <v-toolbar class="cd-pagination-toolbar mb-2" color="transparent" density="compact" flat>
+      <v-btn
+        class="cd-pagination-button"
+        variant="text"
+        prepend-icon="mdi-chevron-left"
+        :disabled="!canGoPrevious"
+        :loading="isLoadingPage"
+        @click="goToPreviousPage"
+      >
+        Previous
+      </v-btn>
+
+      <v-spacer />
+
+      <div class="text-caption text-medium-emphasis">
+        Page {{ currentPageNumber }}
+      </div>
+
+      <v-spacer />
+
+      <v-btn
+        class="cd-pagination-button"
+        variant="text"
+        append-icon="mdi-chevron-right"
+        :disabled="!canGoNext"
+        :loading="isLoadingPage"
+        @click="goToNextPage"
+      >
+        Next
+      </v-btn>
+    </v-toolbar>
+
     <v-data-table
       class="cd-list-table"
       v-model:expanded="expandedRows"
       :headers="headers"
       :items="displayData"
+      :items-per-page="-1"
+      hide-default-footer
       item-value="id"
       :row-props="getRowProps"
       @click:row="handleRowClick"
@@ -84,6 +118,10 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
 
   const cdRepoClient = useCDRepositoryClient()
   const cdData = ref<any[]>([])
+  const nextCursor = ref<string | null>(null)
+  const previousCursors = ref<Array<string | null>>([])
+  const currentRequestCursor = ref<string | null>(null)
+  const isLoadingPage = ref(false)
   
   const expandedRows = ref<string[]>([])
 
@@ -95,8 +133,14 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
     { title: '', key: 'actions', width: '48px', sortable: false },
   ]
 
+	const currentPageNumber = computed(() => previousCursors.value.length + 1)
+
+	const canGoPrevious = computed(() => previousCursors.value.length > 0 && !isLoadingPage.value)
+
+	const canGoNext = computed(() => Boolean(nextCursor.value) && !isLoadingPage.value)
+
 	onMounted(async () => {
-		cdData.value = await cdRepoClient.fetchCdList()
+		await loadPage(null)
 	})
 
 	const displayData = computed(() => {
@@ -106,6 +150,53 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
 			definition: getDefinition(item)
 		}))
 	})
+
+  async function loadPage (cursor: string | null): Promise<boolean> {
+    isLoadingPage.value = true
+
+    const queryParams = cursor ? [{ key: 'cursor', value: cursor }] : undefined
+    const response = await cdRepoClient.fetchCdPage(queryParams)
+
+    if (!response.success) {
+      isLoadingPage.value = false
+      return false
+    }
+
+    cdData.value = response.items
+    nextCursor.value = response.cursor
+    currentRequestCursor.value = cursor
+    isLoadingPage.value = false
+    return true
+  }
+
+  async function goToNextPage (): Promise<void> {
+    if (!nextCursor.value || isLoadingPage.value) {
+      return
+    }
+
+    const previousCursor = currentRequestCursor.value
+    const targetCursor = nextCursor.value
+
+    if (!await loadPage(targetCursor)) {
+      return
+    }
+
+    previousCursors.value = [...previousCursors.value, previousCursor]
+  }
+
+  async function goToPreviousPage (): Promise<void> {
+    if (previousCursors.value.length === 0 || isLoadingPage.value) {
+      return
+    }
+
+    const targetCursor = previousCursors.value[previousCursors.value.length - 1]
+
+    if (!await loadPage(targetCursor)) {
+      return
+    }
+
+    previousCursors.value = previousCursors.value.slice(0, -1)
+  }
 
 	function getUnit(item: any): string {
 		for (const embeddedSpec in item.embeddedDataSpecifications) {
@@ -189,6 +280,16 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
 </script>
 
 <style scoped>
+.cd-pagination-toolbar {
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-bottom: 0;
+  padding-inline: 8px;
+}
+
+.cd-pagination-button {
+  min-width: 110px;
+}
+
 .cd-list-table {
   width: 100%;
 }
