@@ -1,5 +1,28 @@
 <template>
   <v-container class="pa-0" fluid>
+    <v-btn-group
+      class="import-buttons"
+      divided
+    >
+      <v-btn
+        rounded="lg"
+        text="Import CDs from JSON"
+        variant="outlined"
+        @click="setView('jsonImport', true, undefined)"
+      />
+      <v-btn
+        rounded="lg"
+        text="Import CDs from AASX"
+        variant="outlined"
+        @click="setView('aasxImport', true, undefined)"
+      />
+      <v-btn
+        rounded="lg"
+        text="Import CDs from IEC CDD"
+        variant="outlined"
+        @click="setView('iecImport', true, undefined)"
+      />
+    </v-btn-group>
     <v-toolbar class="cd-pagination-toolbar mb-2" color="transparent" density="compact" flat>
       <v-btn
         class="cd-pagination-button"
@@ -31,7 +54,6 @@
         Next
       </v-btn>
     </v-toolbar>
-
     <v-data-table
       v-model:expanded="expandedRows"
       class="cd-list-table"
@@ -126,7 +148,6 @@
         </tr>
       </template>
     </v-data-table>
-
     <v-toolbar class="cd-pagination-toolbar-bottom mt-2" color="transparent" density="compact" flat>
       <v-btn
         class="cd-pagination-button"
@@ -162,6 +183,9 @@
     <c-d-editor-view :dialog-open="views.edit" @close-dialog="setView('edit', false, undefined)" @update:confirm="reloadUpdatedCD" />
     <c-d-detail-view :dialog-open="views.detail" @close-dialog="setView('detail', false, undefined)" />
     <c-d-json-exporter :dialog-open="views.download" @close-dialog="setView('download', false, undefined)" />
+    <c-d-json-importer :dialog-open="views.jsonImport" @close-dialog="setView('jsonImport', false, undefined)" />
+    <aasx-cd-importer-view :dialog-open="views.aasxImport" @close-dialog="setView('aasxImport', false, undefined)" />
+    <iec-importer-view :dialog-open="views.iecImport" @close-dialog="setView('iecImport', false, undefined)" />
   </v-container></template>
 
 <script lang="ts" setup>
@@ -172,6 +196,8 @@
   import CDDetailView from './CDDetailView.vue'
   import CDEditorView from './CDEditorView.vue'
   import CDJsonExporter from './ConceptDescriptionElements/CDJsonExporter.vue'
+  import CDJsonImporter from './ConceptDescriptionElements/CDJsonImporter.vue'
+  import IecImporterView from './ConceptDescriptionElements/IecImporterView.vue'
 
   const { dispatchSelectedCD } = useCDStore()
   const cdRepoClient = useCDRepositoryClient()
@@ -201,6 +227,9 @@
     edit: false,
     detail: false,
     download: false,
+    jsonImport: false,
+    aasxImport: false,
+    iecImport: false,
   })
 
   onMounted(async () => {
@@ -365,12 +394,14 @@
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-bottom: 0;
   padding-inline: 8px;
+  margin-bottom: 0;
 }
 
 .cd-pagination-toolbar-bottom {
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-top: 0;
   padding-inline: 8px;
+  margin-top: 0;
 }
 
 .cd-pagination-button {
@@ -378,6 +409,7 @@
 }
 
 .cd-list-table {
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   width: 100%;
 }
 
@@ -401,5 +433,10 @@
 
 .cd-list-table :deep(.expanded-row-highlight) {
   background-color: rgba(var(--v-theme-primary), 0.08) !important;
+}
+
+.import-buttons {
+  display: flex;
+  padding-bottom: 10px;
 }
 </style>
