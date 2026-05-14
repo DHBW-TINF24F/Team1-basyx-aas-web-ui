@@ -31,6 +31,7 @@ declare module 'vue' {
     CADPreview: typeof import('./components/Plugins/CADPreview.vue')['default']
     CarbonFootprint_v0_9: typeof import('./components/Plugins/Submodels/CarbonFootprint_v0_9.vue')['default']
     CarbonFootprint_v1_0: typeof import('./components/Plugins/Submodels/CarbonFootprint_v1_0.vue')['default']
+    CDDetailView: typeof import('./components/CDDetailView.vue')['default']
     CDEditor: typeof import('./components/ConceptDescriptionElements/CDEditor.vue')['default']
     CDEditorView: typeof import('./components/CDEditorView.vue')['default']
     CDManager: typeof import('./components/CDManager.vue')['default']
