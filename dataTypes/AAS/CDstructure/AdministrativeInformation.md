@@ -1,6 +1,0 @@
-- version -> [VersionType](./VersionType.md)
-- revision -> [RevisionType](./RevisionType.md)
-- creator -> [Reference](./Reference.md)
-- createdAt -> dateTime #TimeFormat
-- updatedAt -> dateTime #TimeFormat
-- templateId -> [Identifier](./Identifier.md)

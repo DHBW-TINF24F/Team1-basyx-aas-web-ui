@@ -1,1 +1,0 @@
-string with max 128 and min 1 characters
