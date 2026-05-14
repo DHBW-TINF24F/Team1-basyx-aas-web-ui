@@ -71,13 +71,19 @@
             />
           </template>
           <v-list>
+            <v-list-item @click="setView('detail', true, item)">
+              <template #prepend>
+                <v-icon>{{ 'mdi-file-search-outline' }}</v-icon>
+              </template>
+              <v-list-item-title>{{ 'View' }}</v-list-item-title>
+            </v-list-item>
             <v-list-item @click="toggleRowExpansion(item.id)">
               <template #prepend>
                 <v-icon>{{ isRowExpanded(item.id) ? 'mdi-eye-off' : 'mdi-eye' }}</v-icon>
               </template>
               <v-list-item-title>{{ isRowExpanded(item.id) ? 'Collapse' : 'Expand' }}</v-list-item-title>
             </v-list-item>
-            <v-list-item @click="toggleView('edit', item)">
+            <v-list-item @click="setView('edit', true, item)">
               <template #prepend>
                 <v-icon>{{ 'mdi-pencil' }}</v-icon>
               </template>
@@ -147,7 +153,8 @@
       </v-btn>
     </v-toolbar>
 
-    <c-d-editor-view :dialog-open="views.edit" @close-dialog="toggleView('edit', undefined)" @update:confirm="reloadUpdatedCD" />
+    <c-d-editor-view :dialog-open="views.edit" @close-dialog="setView('edit', false, undefined)" @update:confirm="reloadUpdatedCD" />
+    <c-d-detail-view :dialog-open="views.detail" @close-dialog="setView('detail', false, undefined)" />
   </v-container></template>
 
 <script lang="ts" setup>
@@ -155,6 +162,7 @@
   import { computed, onMounted, ref } from 'vue'
   import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient'
   import { useCDStore } from '@/store/ConceptDescriptionStore'
+  import CDDetailView from './CDDetailView.vue'
   import CDEditorView from './CDEditorView.vue'
 
   const { dispatchSelectedCD } = useCDStore()
@@ -183,6 +191,7 @@
 
   const views = reactive<any>({
     edit: false,
+    detail: false,
   })
 
   onMounted(async () => {
@@ -319,13 +328,13 @@
     return `${text.slice(0, maxLength - 1)}…`
   }
 
-  function toggleView (viewName: string, item: any | undefined) {
+  function setView (viewName: string, state: boolean, item: any | undefined) {
     if (item!) {
       const cd = jsonization.conceptDescriptionFromJsonable(item)
       dispatchSelectedCD(cd.value)
     }
     if (views && viewName && viewName in views) {
-      views[viewName] = !views[viewName]
+      views[viewName] = state
     }
   }
 
