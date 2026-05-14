@@ -76,6 +76,7 @@
                 variant="flat"
               />
               <v-btn
+                v-if="!isEnglishPreferredName(description)"
                 class="text-buttonText"
                 color="red"
                 density="compact"
@@ -158,11 +159,19 @@
   }
 
   function cancelSubmit (description: LangString) {
-    if (props.attributeName && props.attributeName === 'preferredName' && description.language && description.language === 'en') {
-      return // this is a restriction explicitly mentioned here: https://industrialdigitaltwin.io/aas-specifications/IDTA-01003-a/v3.1/specification.html#DataSpecificationIec61360 -> preferredName attribute
+    if (isEnglishPreferredName(description)) {
+      return
     }
     deleteItem(description, localDescriptionArray, activeEdits)
     emit('update:description', localDescriptionArray, props.attributeName)
+  }
+
+  // this is a restriction explicitly mentioned here: https://industrialdigitaltwin.io/aas-specifications/IDTA-01003-a/v3.1/specification.html#DataSpecificationIec61360 -> preferredName attribute
+  function isEnglishPreferredName (description: LangString) {
+    if (!description) {
+      return false
+    }
+    return (props.attributeName && props.attributeName === 'preferredName' && description.language && description.language === 'en') ? true : false
   }
 
   // updates the description passed by the parent

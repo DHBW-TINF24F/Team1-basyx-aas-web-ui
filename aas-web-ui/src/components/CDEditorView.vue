@@ -1,13 +1,9 @@
 <template>
   <v-container>
-    <v-btn @click="toggleDialog('editor')">
-      Open Dialog
-    </v-btn>
-
-    <v-dialog v-model="dialog.editor" persistent width="1000">
+    <v-dialog v-model="dialogOpen" persistent width="1000">
       <c-d-editor
-        :concept-description="model"
-        @cancel:edit="toggleDialog('editor')"
+        :concept-description="conceptDescription"
+        @cancel:edit="closeDialog()"
         @update:concept-description="updateConceptDescription"
       />
     </v-dialog>
@@ -17,29 +13,30 @@
 <script setup lang="ts">
   import { jsonization } from '@aas-core-works/aas-core3.1-typescript'
   import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient'
+  import { useCDStore } from '@/store/ConceptDescriptionStore'
   import { useNavigationStore } from '@/store/NavigationStore'
 
-  const { fetchCd, getCdEndpointById, putConceptDescription } = useCDRepositoryClient()
+  const { putConceptDescription } = useCDRepositoryClient()
+  const props = defineProps({
+    dialogOpen: {
+      type: Boolean,
+      default: false,
+    },
+  })
+
+  const dialogOpen = ref(props.dialogOpen)
+
   const navigationStore = useNavigationStore()
 
   const emit = defineEmits<{
     (event: 'update:confirm', id: string): void
+    (event: 'close-dialog'): void
   }>()
 
-  const model = ref({})
-  const dialog = reactive<any>({
-    editor: false,
-  })
+  const conceptDescription = reactive<any>({})
 
-  async function getCdByID () {
-    const hardcodedID = 'https://example.com/aas/concept-descriptions/temperature'
-    const endpoint = getCdEndpointById(hardcodedID)
-    const cd = await fetchCd(endpoint)
-    model.value = cd
-  }
-
-  function toggleDialog (component: string) {
-    dialog[component] = !dialog[component]
+  function closeDialog () {
+    emit('close-dialog')
   }
 
   async function updateConceptDescription (value: any) {
@@ -54,10 +51,10 @@
           timeout: 8000,
           color: response ? 'success' : 'warning',
           btnColor: 'buttonText',
-          text: response ? `Successfully updated ConceptDescription: ${value.idShort}` : `Failed to update ConceptDescription: ${value.idShort}`,
+          text: response ? `Successfully updated ConceptDescription: ${value.id}` : `Failed to update ConceptDescription: ${value.id}`,
         })
-        toggleDialog('editor')
         emit('update:confirm', value.id)
+        closeDialog()
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error)
@@ -71,7 +68,14 @@
     }
   }
 
-  onMounted(() => {
-    getCdByID()
-  })
+  watch(
+    () => props.dialogOpen,
+    newVal => {
+      if (newVal) {
+        const cd = jsonization.toJsonable(toRaw(useCDStore().getSelectedCD))
+        Object.assign(conceptDescription, structuredClone(cd))
+      }
+      dialogOpen.value = newVal
+    },
+  )
 </script>

@@ -1,12 +1,12 @@
 <template>
-  <v-container fluid class="pa-0">
+  <v-container class="pa-0" fluid>
     <v-toolbar class="cd-pagination-toolbar mb-2" color="transparent" density="compact" flat>
       <v-btn
         class="cd-pagination-button"
-        variant="text"
-        prepend-icon="mdi-chevron-left"
         :disabled="!canGoPrevious"
         :loading="isLoadingPage"
+        prepend-icon="mdi-chevron-left"
+        variant="text"
         @click="goToPreviousPage"
       >
         Previous
@@ -21,11 +21,11 @@
       <v-spacer />
 
       <v-btn
-        class="cd-pagination-button"
-        variant="text"
         append-icon="mdi-chevron-right"
+        class="cd-pagination-button"
         :disabled="!canGoNext"
         :loading="isLoadingPage"
+        variant="text"
         @click="goToNextPage"
       >
         Next
@@ -33,13 +33,13 @@
     </v-toolbar>
 
     <v-data-table
-      class="cd-list-table"
       v-model:expanded="expandedRows"
+      class="cd-list-table"
       :headers="headers"
-      :items="displayData"
-      :items-per-page="-1"
       hide-default-footer
       item-value="id"
+      :items="displayData"
+      :items-per-page="-1"
       :row-props="getRowProps"
       @click:row="handleRowClick"
     >
@@ -65,8 +65,8 @@
             <v-btn
               v-bind="props"
               icon="mdi-dots-vertical"
-              variant="text"
               size="small"
+              variant="text"
               @click.stop
             />
           </template>
@@ -77,14 +77,20 @@
               </template>
               <v-list-item-title>{{ isRowExpanded(item.id) ? 'Collapse' : 'Expand' }}</v-list-item-title>
             </v-list-item>
+            <v-list-item @click="toggleView('edit', item)">
+              <template #prepend>
+                <v-icon>{{ 'mdi-pencil' }}</v-icon>
+              </template>
+              <v-list-item-title>{{ 'Edit' }}</v-list-item-title>
+            </v-list-item>
           </v-list>
         </v-menu>
       </template>
 
       <template #expanded-row="{ columns, item }">
         <tr>
-          <td :colspan="columns.length" class="px-0 py-0">
-            <v-card flat class="pa-4 bg-surface">
+          <td class="px-0 py-0" :colspan="columns.length">
+            <v-card class="pa-4 bg-surface" flat>
               <v-row dense>
                 <v-col cols="12" md="6">
                   <div class="text-caption text-medium-emphasis">ID Short</div>
@@ -112,10 +118,10 @@
     <v-toolbar class="cd-pagination-toolbar-bottom mt-2" color="transparent" density="compact" flat>
       <v-btn
         class="cd-pagination-button"
-        variant="text"
-        prepend-icon="mdi-chevron-left"
         :disabled="!canGoPrevious"
         :loading="isLoadingPage"
+        prepend-icon="mdi-chevron-left"
+        variant="text"
         @click="goToPreviousPage"
       >
         Previous
@@ -130,31 +136,35 @@
       <v-spacer />
 
       <v-btn
-        class="cd-pagination-button"
-        variant="text"
         append-icon="mdi-chevron-right"
+        class="cd-pagination-button"
         :disabled="!canGoNext"
         :loading="isLoadingPage"
+        variant="text"
         @click="goToNextPage"
       >
         Next
       </v-btn>
     </v-toolbar>
-  </v-container>
-</template>
+
+    <c-d-editor-view :dialog-open="views.edit" @close-dialog="toggleView('edit', undefined)" @update:confirm="reloadUpdatedCD" />
+  </v-container></template>
 
 <script lang="ts" setup>
-import { onMounted, ref, computed } from 'vue';
-import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
+  import { jsonization } from '@aas-core-works/aas-core3.1-typescript'
+  import { computed, onMounted, ref } from 'vue'
+  import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient'
+  import { useCDStore } from '@/store/ConceptDescriptionStore'
+  import CDEditorView from './CDEditorView.vue'
 
-
+  const { dispatchSelectedCD } = useCDStore()
   const cdRepoClient = useCDRepositoryClient()
   const cdData = ref<any[]>([])
   const nextCursor = ref<string | null>(null)
   const previousCursors = ref<Array<string | null>>([])
   const currentRequestCursor = ref<string | null>(null)
   const isLoadingPage = ref(false)
-  
+
   const expandedRows = ref<string[]>([])
 
   const headers = [
@@ -165,23 +175,27 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
     { title: '', key: 'actions', width: '48px', sortable: false },
   ]
 
-	const currentPageNumber = computed(() => previousCursors.value.length + 1)
+  const currentPageNumber = computed(() => previousCursors.value.length + 1)
 
-	const canGoPrevious = computed(() => previousCursors.value.length > 0 && !isLoadingPage.value)
+  const canGoPrevious = computed(() => previousCursors.value.length > 0 && !isLoadingPage.value)
 
-	const canGoNext = computed(() => Boolean(nextCursor.value) && !isLoadingPage.value)
+  const canGoNext = computed(() => Boolean(nextCursor.value) && !isLoadingPage.value)
 
-	onMounted(async () => {
-		await loadPage(null)
-	})
+  const views = reactive<any>({
+    edit: false,
+  })
 
-	const displayData = computed(() => {
-		return cdData.value.map(item => ({
-			...item,
-			unit: getUnit(item),
-			definition: getDefinition(item)
-		}))
-	})
+  onMounted(async () => {
+    await loadPage(null)
+  })
+
+  const displayData = computed(() => {
+    return cdData.value.map(item => ({
+      ...item,
+      unit: getUnit(item),
+      definition: getDefinition(item),
+    }))
+  })
 
   async function loadPage (cursor: string | null): Promise<boolean> {
     isLoadingPage.value = true
@@ -221,7 +235,7 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
       return
     }
 
-    const targetCursor = previousCursors.value[previousCursors.value.length - 1]
+    const targetCursor = previousCursors.value.at(-1)
 
     if (!await loadPage(targetCursor)) {
       return
@@ -230,24 +244,24 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
     previousCursors.value = previousCursors.value.slice(0, -1)
   }
 
-	function getUnit(item: any): string {
-		for (const embeddedSpec in item.embeddedDataSpecifications) {
+  function getUnit (item: any): string {
+    for (const embeddedSpec in item.embeddedDataSpecifications) {
       const spec = item.embeddedDataSpecifications[embeddedSpec]
       if (spec.dataSpecificationContent && spec.dataSpecificationContent.unit) {
         return spec.dataSpecificationContent.unit
       }
     }
-		return ''
-	}
+    return ''
+  }
 
-	function getDefinition(item: any): string {
-		for (const embeddedSpec in item.embeddedDataSpecifications) {
+  function getDefinition (item: any): string {
+    for (const embeddedSpec in item.embeddedDataSpecifications) {
       const spec = item.embeddedDataSpecifications[embeddedSpec]
       if (spec.dataSpecificationContent && spec.dataSpecificationContent.definition) {
         const definitions = spec.dataSpecificationContent.definition
-        
+
         if (!Array.isArray(definitions)) return ''
-        
+
         const enDef = definitions.find((def: any) => def.language === 'en')
         if (enDef?.text) {
           return enDef.text
@@ -259,43 +273,40 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
       }
     }
     return ''
-	}
+  }
 
   function handleRowClick (_event: MouseEvent, { item }: { item: any }): void {
     const itemId = item.id
     const index = expandedRows.value.indexOf(itemId)
 
+    dispatchSelectedCD(item)
     if (index === -1) {
       expandedRows.value = [itemId]
       return
     }
 
-    expandedRows.value = expandedRows.value.filter((expandedId) => expandedId !== itemId)
+    expandedRows.value = expandedRows.value.filter(expandedId => expandedId !== itemId)
   }
 
   function getRowProps ({ item }: { item: any }): Record<string, any> {
     return {
       class: [
         'cursor-pointer',
-        isRowExpanded(item.id) ? 'expanded-row-highlight' : ''
+        isRowExpanded(item.id) ? 'expanded-row-highlight' : '',
       ],
     }
   }
 
-  function isRowExpanded(itemId: string): boolean {
+  function isRowExpanded (itemId: string): boolean {
     return expandedRows.value.includes(itemId)
   }
 
-  function toggleRowExpansion(itemId: string): void {
+  function toggleRowExpansion (itemId: string): void {
     const index = expandedRows.value.indexOf(itemId)
-    if (index === -1) {
-      expandedRows.value = [itemId]
-    } else {
-      expandedRows.value = expandedRows.value.filter((id) => id !== itemId)
-    }
+    expandedRows.value = index === -1 ? [itemId] : expandedRows.value.filter(id => id !== itemId)
   }
 
-  function truncateText(value: unknown, maxLength = 40): string {
+  function truncateText (value: unknown, maxLength = 40): string {
     if (value === undefined || value === null) {
       return '—'
     }
@@ -308,7 +319,27 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
     return `${text.slice(0, maxLength - 1)}…`
   }
 
+  function toggleView (viewName: string, item: any | undefined) {
+    if (item!) {
+      const cd = jsonization.conceptDescriptionFromJsonable(item)
+      dispatchSelectedCD(cd.value)
+    }
+    if (views && viewName && viewName in views) {
+      views[viewName] = !views[viewName]
+    }
+  }
 
+  async function reloadUpdatedCD (id: string) {
+    const oldCd = cdData.value.find(cd => cd.id === id)
+    if (oldCd) {
+      const res = await cdRepoClient.fetchCdById(id)
+      if (!res) {
+        return
+      }
+      const index = cdData.value.indexOf(oldCd)
+      cdData.value[index] = res
+    }
+  }
 </script>
 
 <style scoped>
