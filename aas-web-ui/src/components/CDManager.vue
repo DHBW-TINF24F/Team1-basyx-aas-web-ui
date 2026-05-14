@@ -394,12 +394,14 @@
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-bottom: 0;
   padding-inline: 8px;
+  margin-bottom: 0;
 }
 
 .cd-pagination-toolbar-bottom {
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-top: 0;
   padding-inline: 8px;
+  margin-top: 0;
 }
 
 .cd-pagination-button {

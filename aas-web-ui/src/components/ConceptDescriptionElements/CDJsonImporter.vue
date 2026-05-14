@@ -117,13 +117,3 @@
     },
   )
 </script>
-
-<style scoped>
-.upload-area {
-  border: 2px dashed #888;
-  border-radius: 8px;
-  padding: 2rem;
-  text-align: center;
-  cursor: pointer;
-}
-</style>
