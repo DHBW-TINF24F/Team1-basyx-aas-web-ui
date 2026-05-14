@@ -1,18 +1,10 @@
 <template>
   <v-container fluid class="pa-0">
-    <v-text-field
-      v-model="search"
-      class="mb-4"
-      density="compact"
-      hide-details
-      label="Type to search for specific ConceptDescriptions..."
-      variant="outlined"
-    />
     <v-data-table
       class="cd-list-table"
       v-model:expanded="expandedRows"
       :headers="headers"
-      :items="filteredData"
+      :items="displayData"
       item-value="id"
       :row-props="getRowProps"
       @click:row="handleRowClick"
@@ -92,16 +84,16 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
 
   const cdRepoClient = useCDRepositoryClient()
   const cdData = ref<any[]>([])
-  const search = ref('')
+  
   const expandedRows = ref<string[]>([])
 
   const headers = [
-		{ title: 'ID Short', key: 'idShort', width: '1fr' },
-		{ title: 'Unit', key: 'unit', width: '1fr' },
-		{ title: 'Definition', key: 'definition', width: '5fr' },
-    { title: 'ID', key: 'id', width: '2fr' },
+    { title: 'ID Short', key: 'idShort', width: '1fr', sortable: false },
+    { title: 'Unit', key: 'unit', width: '1fr', sortable: false },
+    { title: 'Definition', key: 'definition', width: '5fr', sortable: false },
+    { title: 'ID', key: 'id', width: '2fr', sortable: false },
     { title: '', key: 'actions', width: '48px', sortable: false },
-	]
+  ]
 
 	onMounted(async () => {
 		cdData.value = await cdRepoClient.fetchCdList()
@@ -114,20 +106,6 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
 			definition: getDefinition(item)
 		}))
 	})
-
-  const filteredData = computed(() => {
-    const query = search.value.trim().toLowerCase()
-
-    if (!query) {
-      return displayData.value
-    }
-
-    return displayData.value.filter((item) => {
-      return [item.idShort, item.unit, item.definition, item.id]
-        .filter((value) => value !== undefined && value !== null)
-        .some((value) => String(value).toLowerCase().includes(query))
-    })
-  })
 
 	function getUnit(item: any): string {
 		for (const embeddedSpec in item.embeddedDataSpecifications) {
