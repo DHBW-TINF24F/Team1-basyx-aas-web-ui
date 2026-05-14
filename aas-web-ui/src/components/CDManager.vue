@@ -108,6 +108,38 @@
         </tr>
       </template>
     </v-data-table>
+
+    <v-toolbar class="cd-pagination-toolbar-bottom mt-2" color="transparent" density="compact" flat>
+      <v-btn
+        class="cd-pagination-button"
+        variant="text"
+        prepend-icon="mdi-chevron-left"
+        :disabled="!canGoPrevious"
+        :loading="isLoadingPage"
+        @click="goToPreviousPage"
+      >
+        Previous
+      </v-btn>
+
+      <v-spacer />
+
+      <div class="text-caption text-medium-emphasis">
+        Page {{ currentPageNumber }}
+      </div>
+
+      <v-spacer />
+
+      <v-btn
+        class="cd-pagination-button"
+        variant="text"
+        append-icon="mdi-chevron-right"
+        :disabled="!canGoNext"
+        :loading="isLoadingPage"
+        @click="goToNextPage"
+      >
+        Next
+      </v-btn>
+    </v-toolbar>
   </v-container>
 </template>
 
@@ -283,6 +315,12 @@ import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient';
 .cd-pagination-toolbar {
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-bottom: 0;
+  padding-inline: 8px;
+}
+
+.cd-pagination-toolbar-bottom {
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-top: 0;
   padding-inline: 8px;
 }
 
