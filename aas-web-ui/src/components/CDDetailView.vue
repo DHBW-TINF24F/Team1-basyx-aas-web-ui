@@ -1,6 +1,6 @@
 <template>
   <v-container>
-    <v-dialog v-model="dialogOpen" width="800" @click.outside="closeDialog">
+    <v-dialog v-model="dialogOpen" width="800" @click:outside="closeDialog">
       <v-list>
         <v-list-item>
           <div class="scrollable">
