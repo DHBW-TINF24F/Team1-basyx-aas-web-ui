@@ -5,6 +5,100 @@
       <v-card-subtitle class="text-center pb-2">Import local Excel files (multiple selection supported)</v-card-subtitle>
       <v-divider />
       <v-card-text>
+        <!-- Tutorial: How to export Excel files from IEC CDD -->
+        <v-expansion-panels class="mb-3">
+          <v-expansion-panel>
+            <v-expansion-panel-title>
+              <template #default="{ expanded }">
+                <div class="d-flex align-center">
+                  <v-icon class="mr-2" icon="mdi-help-circle-outline" />
+                  <span>How to export Excel files of a property or class from IEC CDD</span>
+                </div>
+                <v-spacer />
+              </template>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <v-alert class="mb-3" density="compact" type="success" variant="tonal">
+                <strong>No account required:</strong> the IEC CDD lets you browse and
+                export Excel files directly — there is no login, sign-up or paywall
+                for the steps below.
+              </v-alert>
+              <ol class="tutorial-list">
+                <li class="mb-2">
+                  Open the IEC Common Data Dictionary at
+                  <a href="https://cdd.iec.ch" rel="noopener" target="_blank">cdd.iec.ch</a>.
+                  Use the tree navigation on the left or the search bar at the top
+                  right to locate the desired <strong>class</strong> or
+                  <strong>property</strong>, then click it to open the detail view.
+                  You should see the metadata table (<code>code</code>,
+                  <code>preferred name</code>, <code>definition</code>,
+                  <code>primary unit</code>, <code>data type</code>, …) and four
+                  orange action buttons above it.
+                </li>
+                <li class="mb-2">
+                  Click the orange <strong>Export</strong> button in the toolbar
+                  above the metadata table.
+                  <div class="tutorial-figure my-2">
+                    <img
+                      alt="IEC CDD detail view with Export button highlighted"
+                      class="tutorial-img"
+                      src="@/assets/Tutorials/IecCdd/01-detail-view.png"
+                    >
+                  </div>
+                </li>
+                <li class="mb-2">
+                  In the dropdown that appears, choose what to export:
+                  <ul class="mt-1">
+                    <li><strong>Attributes</strong> — the metadata of the selected class itself.</li>
+                    <li><strong>Properties</strong> — all properties of the selected class as rows.</li>
+                    <li><strong>All</strong> — attributes and properties combined.</li>
+                  </ul>
+                  Pick the option that matches what you want to import.
+                  <div class="tutorial-figure my-2">
+                    <img
+                      alt="IEC CDD Export dropdown with Attributes, Properties and All"
+                      class="tutorial-img tutorial-img--narrow"
+                      src="@/assets/Tutorials/IecCdd/02-export-menu.png"
+                    >
+                  </div>
+                </li>
+                <li class="mb-2">
+                  A download page opens with the green Excel icon. Click
+                  <strong>Download</strong> to save the <code>.xlsx</code> file
+                  straight to your downloads folder — no login prompt appears.
+                  <div class="tutorial-figure my-2">
+                    <img
+                      alt="IEC CDD download page with Excel icon and Download link"
+                      class="tutorial-img"
+                      src="@/assets/Tutorials/IecCdd/03-download-page.png"
+                    >
+                  </div>
+                </li>
+                <li>
+                  Come back here, click <em>Upload files</em> below and select the
+                  downloaded Excel file (or several files at once) to import.
+                </li>
+              </ol>
+              <v-alert class="mt-3" density="compact" type="info" variant="tonal">
+                <strong>Tip:</strong> The importer auto-detects the IEC-CDD header row
+                (e.g. <code>#property_name</code>, <code>code</code>, <code>preferredname</code>,
+                <code>primaryunit</code>, <code>data_type</code>). Custom Excel layouts that
+                do not contain these columns will not be recognised as IEC-CDD properties.
+              </v-alert>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
+
+        <!-- Info Alerts -->
+        <v-alert class="mb-3" density="compact" type="info" variant="tonal">
+          The IEC Importer only supports import via file upload. Download IEC-CDD datasets as Excel files and
+          upload them here. You can select multiple files at once.
+        </v-alert>
+
+        <v-alert class="mb-3" density="compact" type="info" variant="tonal">
+          Supported formats: XLSX/XLS (Excel), as well as JSON, XML, CSV and YAML.
+        </v-alert>
+
         <!-- File Upload Button -->
         <v-btn
           block
@@ -24,16 +118,6 @@
           type="file"
           @change="handleFileUpload"
         >
-
-        <!-- Info Alerts -->
-        <v-alert class="mb-3" density="compact" type="info" variant="tonal">
-          The IEC Importer only supports import via file upload. Download IEC-CDD datasets as Excel files and
-          upload them here. You can select multiple files at once.
-        </v-alert>
-
-        <v-alert class="mb-3" density="compact" type="info" variant="tonal">
-          Supported formats: XLSX/XLS (Excel), as well as JSON, XML, CSV and YAML.
-        </v-alert>
 
         <!-- Format Detection -->
         <v-alert
@@ -84,27 +168,13 @@
         </v-alert>
 
         <!-- Structured Properties Table -->
-        <v-card v-if="validationResult && validationResult.isValid" class="mb-3" variant="outlined">
-          <v-card-title class="text-subtitle-1">IEC-CDD Properties</v-card-title>
-          <v-card-text>
-            <v-text-field
-              v-model="tableSearch"
-              class="mb-2"
-              clearable
-              density="compact"
-              label="Search properties..."
-              prepend-inner-icon="mdi-magnify"
-              variant="outlined"
-            />
-            <v-data-table
-              density="compact"
-              :headers="propertyTableHeaders"
-              :items="validationResult.properties"
-              items-per-page="10"
-              :search="tableSearch"
-            />
-          </v-card-text>
-        </v-card>
+        <ConceptDescriptionTableView
+          v-if="validationResult && validationResult.isValid"
+          class="mb-3"
+          :rows="conceptDescriptionRows"
+          :show-source="false"
+          @view-diff="openDiffDialog"
+        />
 
         <!-- Save to CD Repository -->
         <v-btn
@@ -156,13 +226,83 @@
         </v-expansion-panels>
       </v-card-text>
     </v-card>
+
+    <!-- Diff Dialog -->
+    <v-dialog v-model="diffDialogOpen" width="800">
+      <v-sheet border rounded="lg">
+        <v-card-title class="bg-cardHeader">
+          <v-icon class="mr-2" icon="mdi-compare" />
+          Compare Concept Descriptions
+        </v-card-title>
+        <v-divider />
+        <v-card-text>
+          <p class="text-caption text-medium-emphasis mb-3">
+            <strong>ID:</strong> {{ diffRow?.id }}
+          </p>
+          <template v-if="diffRow && diffRow.existingJson">
+            <v-alert
+              v-if="computeCdDiff(diffRow.json, diffRow.existingJson).length === 0"
+              class="mb-3"
+              density="compact"
+              type="success"
+            >
+              No differences found. The incoming CD is identical to the existing one.
+            </v-alert>
+
+            <v-table v-else class="border rounded mb-3" density="compact">
+              <thead>
+                <tr>
+                  <th style="width:160px">Field</th>
+                  <th>
+                    <v-chip class="mr-1" color="primary" size="x-small">Incoming</v-chip>
+                    from IEC file
+                  </th>
+                  <th>
+                    <v-chip class="mr-1" color="warning" size="x-small">Existing</v-chip>
+                    in Repository
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="diff in computeCdDiff(diffRow.json, diffRow.existingJson)"
+                  :key="diff.field"
+                >
+                  <td class="text-caption font-weight-bold">{{ diff.field }}</td>
+                  <td class="text-caption text-success">
+                    <pre style="white-space: pre-wrap; word-break: break-all">{{ diff.incoming }}</pre>
+                  </td>
+                  <td class="text-caption text-warning">
+                    <pre style="white-space: pre-wrap; word-break: break-all">{{ diff.existing }}</pre>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+
+            <v-alert density="compact" type="info">
+              The row is currently
+              <strong>{{ diffRow.selected ? 'selected' : 'deselected' }}</strong> —
+              {{ diffRow.selected ? 'saving will overwrite the existing CD with the incoming version.' : 'the existing version will be kept.' }}
+              Toggle the checkbox in the table to change your selection.
+            </v-alert>
+          </template>
+        </v-card-text>
+        <v-divider />
+        <v-card-actions>
+          <v-spacer />
+          <v-btn rounded="lg" @click="diffDialogOpen = false">Close</v-btn>
+        </v-card-actions>
+      </v-sheet>
+    </v-dialog>
   </v-container>
 </template>
 
 <script setup lang="ts">
+  import type { ConceptDescriptionTableRow } from '@/types/ConceptDescriptionTable'
   import type { IecCddProperty, IecCddValidationResult } from '@/types/IecCdd'
   import { jsonization } from '@aas-core-works/aas-core3.1-typescript'
   import { ref } from 'vue'
+  import ConceptDescriptionTableView from '@/components/UIComponents/ConceptDescriptionTableView.vue'
   import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient'
   import { useIecFileImport } from '@/composables/IecFileImport'
   import { useInfrastructureStore } from '@/store/InfrastructureStore'
@@ -175,26 +315,27 @@
   const navigationStore = useNavigationStore()
   const infrastructureStore = useInfrastructureStore()
   const { importFileContent } = useIecFileImport()
-  const { postConceptDescription, putConceptDescription, isAvailableByIdInRepo } = useCDRepositoryClient()
+  const { fetchCdList, postConceptDescription, putConceptDescription } = useCDRepositoryClient()
+
+  type JsonRecord = Record<string, unknown>
+  type IecCdRow = ConceptDescriptionTableRow & {
+    property: IecCddProperty
+    json: JsonRecord
+    existingJson: JsonRecord | null
+  }
+  type DiffEntry = { field: string, incoming: string, existing: string }
 
   const datasetLoading = ref<boolean>(false)
   const savingCds = ref<boolean>(false)
   const importedDatasetJsonPreview = ref<string>('')
   const importedDatasetFormat = ref<string>('')
   const validationResult = ref<IecCddValidationResult | null>(null)
-  const tableSearch = ref<string>('')
   const fileInputRef = ref<HTMLInputElement | null>(null)
   const saveResultMessage = ref<string>('')
   const saveResultType = ref<'success' | 'error' | 'info'>('success')
-
-  const propertyTableHeaders = [
-    { title: 'IRDI', key: 'irdi', sortable: true },
-    { title: 'Preferred Name', key: 'preferredName', sortable: true },
-    { title: 'Short Name', key: 'shortName', sortable: true },
-    { title: 'Definition', key: 'definition', sortable: false },
-    { title: 'Unit', key: 'unit', sortable: true },
-    { title: 'Data Type', key: 'dataType', sortable: true },
-  ]
+  const conceptDescriptionRows = ref<IecCdRow[]>([])
+  const diffDialogOpen = ref<boolean>(false)
+  const diffRow = ref<IecCdRow | null>(null)
 
   function triggerFileInput (): void {
     fileInputRef.value?.click()
@@ -206,6 +347,7 @@
     if (!files || files.length === 0) return
 
     datasetLoading.value = true
+    conceptDescriptionRows.value = []
     const allProperties: IecCddProperty[] = []
     const allResults: Array<{ metadata: { detectedFormat: string }, payload: unknown, validation: IecCddValidationResult }> = []
     const formats = new Set<string>()
@@ -239,6 +381,34 @@
         errors: failedFiles.map(f => `Import failed: ${f}`),
         warnings,
       }
+
+      const existingById = new Map<string, JsonRecord>()
+      if (allProperties.length > 0) {
+        try {
+          const existingCds = await fetchCdList()
+          for (const cd of existingCds) {
+            const id = String(cd?.id ?? '').trim()
+            if (id !== '') existingById.set(id, cd as JsonRecord)
+          }
+        } catch {
+          warnings.push('Could not fetch existing CDs from repository — all properties will be treated as NEW.')
+        }
+      }
+
+      conceptDescriptionRows.value = allProperties.map(property => ({
+        id: property.irdi,
+        irdi: property.irdi,
+        preferredName: property.preferredName,
+        shortName: property.shortName ?? '',
+        definition: property.definition ?? '',
+        unit: property.unit ?? '',
+        dataType: property.dataType ?? '',
+        selected: true,
+        status: existingById.has(property.irdi) ? 'exists' : 'new',
+        property,
+        json: buildConceptDescription(property),
+        existingJson: existingById.get(property.irdi) ?? null,
+      }))
 
       const totalProps = allProperties.length
       const successCount = allResults.length
@@ -306,6 +476,13 @@
   async function saveAsConceptDescriptions (): Promise<void> {
     if (!validationResult.value || !validationResult.value.isValid) return
 
+    const selectedRows = conceptDescriptionRows.value.filter(row => row.selected)
+    if (selectedRows.length === 0) {
+      saveResultType.value = 'info'
+      saveResultMessage.value = 'No Concept Descriptions selected.'
+      return
+    }
+
     const cdRepoUrl = infrastructureStore.getConceptDescriptionRepoURL
     if (!cdRepoUrl || cdRepoUrl.trim() === '') {
       saveResultType.value = 'error'
@@ -320,21 +497,20 @@
     let failed = 0
 
     try {
-      for (const property of validationResult.value.properties) {
-        const cdJson = buildConceptDescription(property)
+      for (const row of selectedRows) {
+        const cdJson = buildConceptDescription(row.property)
         const cdResult = jsonization.conceptDescriptionFromJsonable(cdJson)
 
         if (cdResult.error !== null) {
-          console.warn('Failed to deserialize CD for IRDI', property.irdi, cdResult.error)
+          console.warn('Failed to deserialize CD for IRDI', row.property.irdi, cdResult.error)
           failed++
           continue
         }
 
         const cd = cdResult.mustValue()
-        const exists = await isAvailableByIdInRepo(property.irdi)
 
         let success
-        if (exists) {
+        if (row.status === 'exists') {
           success = await putConceptDescription(cd)
           if (success) updated++
           else failed++
@@ -378,6 +554,57 @@
     downloadBlob(csvContent, 'iec-cdd-properties.csv', 'text/csv')
   }
 
+  function extractDataSpecificationContent (json: JsonRecord): JsonRecord | null {
+    const eds = Array.isArray(json.embeddedDataSpecifications) ? json.embeddedDataSpecifications : []
+    if (eds.length === 0) return null
+    return ((eds[0] as any)?.dataSpecificationContent ?? null) as JsonRecord | null
+  }
+
+  function computeCdDiff (incoming: JsonRecord, existing: JsonRecord): DiffEntry[] {
+    const diffs: DiffEntry[] = []
+
+    const stringify = (v: unknown): string => {
+      if (v === undefined || v === null) return '—'
+      if (typeof v === 'string') return v
+      return JSON.stringify(v, null, 2)
+    }
+
+    for (const field of ['id', 'category', 'idShort']) {
+      const a = stringify(incoming[field])
+      const b = stringify(existing[field])
+      if (a !== b) diffs.push({ field, incoming: a, existing: b })
+    }
+
+    for (const field of ['displayName', 'description']) {
+      const a = stringify(incoming[field])
+      const b = stringify(existing[field])
+      if (a !== b) diffs.push({ field, incoming: a, existing: b })
+    }
+
+    const inContent = extractDataSpecificationContent(incoming)
+    const exContent = extractDataSpecificationContent(existing)
+
+    for (const field of ['dataType', 'unit', 'symbol', 'sourceOfDefinition', 'valueFormat']) {
+      const a = stringify(inContent?.[field])
+      const b = stringify(exContent?.[field])
+      if (a !== b) diffs.push({ field: `EDS.${field}`, incoming: a, existing: b })
+    }
+
+    for (const field of ['preferredName', 'shortName', 'definition']) {
+      const a = stringify(inContent?.[field])
+      const b = stringify(exContent?.[field])
+      if (a !== b) diffs.push({ field: `EDS.${field}`, incoming: a, existing: b })
+    }
+
+    return diffs
+  }
+
+  function openDiffDialog (row: ConceptDescriptionTableRow): void {
+    if (!('json' in row) || !('existingJson' in row)) return
+    diffRow.value = row as IecCdRow
+    diffDialogOpen.value = true
+  }
+
   function downloadBlob (content: string, filename: string, mimeType: string): void {
     const blob = new Blob([content], { type: mimeType })
     const objectUrl = URL.createObjectURL(blob)
@@ -390,3 +617,24 @@
     URL.revokeObjectURL(objectUrl)
   }
 </script>
+
+<style scoped>
+.tutorial-figure {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.tutorial-img {
+  max-width: 100%;
+  width: 100%;
+  height: auto;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.tutorial-img--narrow {
+  max-width: 220px;
+  width: auto;
+}
+</style>

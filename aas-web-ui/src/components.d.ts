@@ -37,6 +37,7 @@ declare module 'vue' {
     ComponentConfigPanel: typeof import('./components/AppNavigation/Settings/ComponentConfigPanel.vue')['default']
     ComponentVisualization: typeof import('./components/ComponentVisualization.vue')['default']
     ConceptDescription: typeof import('./components/UIComponents/ConceptDescription.vue')['default']
+    ConceptDescriptionTableView: typeof import('./components/UIComponents/ConceptDescriptionTableView.vue')['default']
     ContactInformations_v1_0: typeof import('./components/Plugins/Submodels/ContactInformations_v1_0.vue')['default']
     DataSpecificationContent: typeof import('./components/UIComponents/DataSpecificationContent.vue')['default']
     DateTimeStampType: typeof import('./components/SubmodelElements/ValueTypes/DateTimeStampType.vue')['default']
