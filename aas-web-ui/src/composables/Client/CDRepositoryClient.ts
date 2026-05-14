@@ -65,6 +65,52 @@ export function useCDRepositoryClient () {
   }
 
   /**
+   * Fetches a paged list of Concept Descriptions together with the next cursor.
+   *
+   * @async
+   * @param {Array<QueryParam>} queryParams - Query parameters passed to the repository.
+   * @returns {Promise<{ items: Array<any>, cursor: string | null, success: boolean }>}
+   */
+  async function fetchCdPage (queryParams?: Array<QueryParam>): Promise<{ items: Array<any>, cursor: string | null, success: boolean }> {
+    const failResponse = { items: [] as Array<any>, cursor: null, success: false }
+
+    if (conceptDescriptionRepoUrl.value.trim() === '') {
+      return failResponse
+    }
+
+    let cdRepoUrl = conceptDescriptionRepoUrl.value
+    if (cdRepoUrl.trim() === '') {
+      return failResponse
+    }
+    if (cdRepoUrl.endsWith('/')) {
+      cdRepoUrl = stripLastCharacter(cdRepoUrl)
+    }
+    if (!cdRepoUrl.endsWith(endpointPath)) {
+      cdRepoUrl += endpointPath
+    }
+    if (queryParams && queryParams.length > 0) {
+      cdRepoUrl = addQueryParams(cdRepoUrl, queryParams)
+    }
+
+    const cdRepoPath = cdRepoUrl
+    const cdRepoContext = 'retrieving all CDs'
+    const disableMessage = false
+    try {
+      const cdRepoResponse = await getRequest(cdRepoPath, cdRepoContext, disableMessage)
+      if (cdRepoResponse.success && cdRepoResponse.data) {
+        const items = Array.isArray(cdRepoResponse.data.result) ? cdRepoResponse.data.result : []
+        const cursor = cdRepoResponse.data.paging_metadata?.cursor ?? null
+        return { items, cursor, success: true }
+      }
+    } catch (error) {
+      console.warn(error)
+      return failResponse
+    }
+
+    return failResponse
+  }
+
+  /**
    * Fetches a Concept Description (CD) by the provided CD ID.
    *
    * @async
@@ -317,6 +363,7 @@ export function useCDRepositoryClient () {
   return {
     endpointPath,
     fetchCdList,
+    fetchCdPage,
     fetchCdById,
     fetchCd,
     isAvailableByIdInRepo,

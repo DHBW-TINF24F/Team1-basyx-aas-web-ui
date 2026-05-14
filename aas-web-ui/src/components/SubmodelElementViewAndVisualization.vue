@@ -27,6 +27,10 @@
               <v-icon start>mdi-code-block-braces</v-icon>
               <span class="hidden-sm-and-down">JSON</span>
             </v-btn>
+            <v-btn class="ma-0" value="CDManager">
+              <v-icon start>mdi-file-document-outline</v-icon>
+              <span class="hidden-sm-and-down">CD Manager</span>
+            </v-btn>
           </v-btn-toggle>
         </div>
       </v-card-title>
@@ -44,6 +48,7 @@
           <SubmodelElementVisualization v-else-if="componentToShow === 'Visualization'" />
           <SubmodelElementJSONView v-if="componentToShow === 'JSONView'" />
         </template>
+        <CDManager v-if="componentToShow === 'CDManager'" />
         <v-empty-state
           v-else-if="
             !['SMViewer', 'SMEditor'].includes(route.name as string) &&
