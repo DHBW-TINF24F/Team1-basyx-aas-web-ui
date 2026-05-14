@@ -34,6 +34,7 @@ declare module 'vue' {
     CDDetailView: typeof import('./components/CDDetailView.vue')['default']
     CDEditor: typeof import('./components/ConceptDescriptionElements/CDEditor.vue')['default']
     CDEditorView: typeof import('./components/CDEditorView.vue')['default']
+    CDJsonExporter: typeof import('./components/ConceptDescriptionElements/CDJsonExporter.vue')['default']
     CDManager: typeof import('./components/CDManager.vue')['default']
     CollectionForm: typeof import('./components/EditorComponents/SubmodelElements/CollectionForm.vue')['default']
     CommandPalette: typeof import('./components/AppNavigation/CommandPalette.vue')['default']

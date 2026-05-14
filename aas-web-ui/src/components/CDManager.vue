@@ -89,6 +89,12 @@
               </template>
               <v-list-item-title>{{ 'Edit' }}</v-list-item-title>
             </v-list-item>
+            <v-list-item @click="setView('download', true, item)">
+              <template #prepend>
+                <v-icon>{{ 'mdi-download' }}</v-icon>
+              </template>
+              <v-list-item-title>{{ 'Download JSON' }}</v-list-item-title>
+            </v-list-item>
           </v-list>
         </v-menu>
       </template>
@@ -155,6 +161,7 @@
 
     <c-d-editor-view :dialog-open="views.edit" @close-dialog="setView('edit', false, undefined)" @update:confirm="reloadUpdatedCD" />
     <c-d-detail-view :dialog-open="views.detail" @close-dialog="setView('detail', false, undefined)" />
+    <c-d-json-exporter :dialog-open="views.download" @close-dialog="setView('download', false, undefined)" />
   </v-container></template>
 
 <script lang="ts" setup>
@@ -164,6 +171,7 @@
   import { useCDStore } from '@/store/ConceptDescriptionStore'
   import CDDetailView from './CDDetailView.vue'
   import CDEditorView from './CDEditorView.vue'
+  import CDJsonExporter from './ConceptDescriptionElements/CDJsonExporter.vue'
 
   const { dispatchSelectedCD } = useCDStore()
   const cdRepoClient = useCDRepositoryClient()
@@ -192,6 +200,7 @@
   const views = reactive<any>({
     edit: false,
     detail: false,
+    download: false,
   })
 
   onMounted(async () => {
