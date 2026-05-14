@@ -12,15 +12,19 @@
         <span class="text-primary">{{ dataSpecificationObject.dataType }}</span>
       </v-list-item-title>
       <v-divider
-        v-if="dataSpecificationObject.definition && dataSpecificationObject.definition.length > 0"
+        v-if="(dataSpecificationObject.definition && dataSpecificationObject.definition.length > 0) || editorMode"
         class="mt-2"
       />
       <!-- definition -->
       <DescriptionElement
-        v-if="dataSpecificationObject.definition && dataSpecificationObject.definition.length > 0"
+        v-if="(dataSpecificationObject.definition && dataSpecificationObject.definition.length > 0) || editorMode"
+        :attributeName="'definition'"
         :description-array="dataSpecificationObject.definition"
         :description-title="'Definition'"
+        :editor-mode="editorMode"
+        :lang-string-max-length="1023"
         :small="true"
+        @update:description="updateDescription"
       />
       <v-divider
         v-if="dataSpecificationObject.levelTypes && dataSpecificationObject.levelTypes.length > 0"
@@ -36,28 +40,37 @@
         <span v-for="(levelType, i) in dataSpecificationObject.levelTypes" :key="i" class="text-primary">{{
           levelType
         }}</span>
+
       </v-list-item-title>
       <v-divider
-        v-if="dataSpecificationObject.preferredName && dataSpecificationObject.preferredName.length > 0"
+        v-if="(dataSpecificationObject.preferredName && dataSpecificationObject.preferredName.length > 0) || editorMode"
         class="mt-2"
       />
       <!-- preferredName -->
       <DescriptionElement
-        v-if="dataSpecificationObject.preferredName && dataSpecificationObject.preferredName.length > 0"
+        v-if="(dataSpecificationObject.preferredName && dataSpecificationObject.preferredName.length > 0) || editorMode"
+        :attributeName="'preferredName'"
         :description-array="dataSpecificationObject.preferredName"
         :description-title="'Preferred Name'"
+        :editor-mode="editorMode"
+        :lang-string-max-length="255"
         :small="true"
+        @update:description="updateDescription"
       />
       <v-divider
-        v-if="dataSpecificationObject.shortName && dataSpecificationObject.shortName.length > 0"
+        v-if="(dataSpecificationObject.shortName && dataSpecificationObject.shortName.length > 0) || editorMode"
         class="mt-2"
       />
       <!-- shortName -->
       <DescriptionElement
-        v-if="dataSpecificationObject.shortName && dataSpecificationObject.shortName.length > 0"
+        v-if="(dataSpecificationObject.shortName && dataSpecificationObject.shortName.length > 0) || editorMode"
+        :attributeName="'shortName'"
         :description-array="dataSpecificationObject.shortName"
         :description-title="'Short Name'"
+        :editor-mode="editorMode"
+        :lang-string-max-length="18"
         :small="true"
+        @update:description="updateDescription"
       />
       <v-divider v-if="dataSpecificationObject.unit" class="mt-2" />
       <!-- unit -->
@@ -104,11 +117,43 @@
 </template>
 
 <script setup lang="ts">
-    // Props
-  defineProps({
+  import type { LangString } from '../ConceptDescriptionElements/EditorComposables/types'
+
+  // Props
+  const props = defineProps({
     dataSpecificationObject: {
       type: Object as any,
       default: {} as any,
     },
+    editorMode: {
+      type: Boolean,
+      default: false,
+    },
+    index: {
+      type: Number,
+      default: 0,
+    },
   })
+
+  const localDataSpecificationObject = reactive<any>({})
+
+  const emit = defineEmits<{
+    (event: 'update:embedded-data-specification-content', value: Array<LangString>, index: number): void
+  }>()
+
+  function updateDescription (value: Array<LangString>, name: string) {
+    localDataSpecificationObject[name] = value
+    emit('update:embedded-data-specification-content', localDataSpecificationObject, props.index)
+  }
+
+  // updates the data specification content passed by the parent
+  watch(
+    () => props.dataSpecificationObject,
+    newVal => {
+      if (newVal) {
+        Object.assign(localDataSpecificationObject, structuredClone(toRaw(newVal)))
+      }
+    },
+    { immediate: true },
+  )
 </script>
