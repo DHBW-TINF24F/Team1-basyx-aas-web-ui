@@ -126,9 +126,4 @@
   text-align: center;
   cursor: pointer;
 }
-
-.right-button {
-  display: flex;
-  justify-content: end;
-}
 </style>

@@ -1,24 +1,28 @@
 <template>
   <v-container class="pa-0" fluid>
-    <v-btn
-      rounded="lg"
-      text="Import CDs from JSON"
-      variant="flat"
-      @click="setView('jsonImport', true, undefined)"
-    />
-    <v-btn
-      rounded="lg"
-      text="Import CDs from AASX"
-      variant="flat"
-      @click="setView('aasxImport', true, undefined)"
-    />
-    <v-btn
-      rounded="lg"
-      text="Import CDs from IEC CDD"
-      variant="flat"
-      @click="setView('iecImport', true, undefined)"
-    />
-
+    <v-btn-group
+      class="import-buttons"
+      divided
+    >
+      <v-btn
+        rounded="lg"
+        text="Import CDs from JSON"
+        variant="outlined"
+        @click="setView('jsonImport', true, undefined)"
+      />
+      <v-btn
+        rounded="lg"
+        text="Import CDs from AASX"
+        variant="outlined"
+        @click="setView('aasxImport', true, undefined)"
+      />
+      <v-btn
+        rounded="lg"
+        text="Import CDs from IEC CDD"
+        variant="outlined"
+        @click="setView('iecImport', true, undefined)"
+      />
+    </v-btn-group>
     <v-toolbar class="cd-pagination-toolbar mb-2" color="transparent" density="compact" flat>
       <v-btn
         class="cd-pagination-button"
@@ -431,5 +435,6 @@
 
 .import-buttons {
   display: flex;
+  padding-bottom: 10px;
 }
 </style>
