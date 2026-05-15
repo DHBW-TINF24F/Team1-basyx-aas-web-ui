@@ -183,9 +183,9 @@
     <c-d-editor-view :dialog-open="views.edit" @close-dialog="setView('edit', false, undefined)" @update:confirm="reloadUpdatedCD" />
     <c-d-detail-view :dialog-open="views.detail" @close-dialog="setView('detail', false, undefined)" />
     <c-d-json-exporter :dialog-open="views.download" @close-dialog="setView('download', false, undefined)" />
-    <c-d-json-importer :dialog-open="views.jsonImport" @close-dialog="setView('jsonImport', false, undefined)" />
-    <aasx-cd-importer-view :dialog-open="views.aasxImport" @close-dialog="setView('aasxImport', false, undefined)" />
-    <iec-importer-view :dialog-open="views.iecImport" @close-dialog="setView('iecImport', false, undefined)" />
+    <c-d-json-importer :dialog-open="views.jsonImport" @close-dialog="closeImportDialog('jsonImport')" />
+    <aasx-cd-importer-view :dialog-open="views.aasxImport" @close-dialog="closeImportDialog('aasxImport')" />
+    <iec-importer-view :dialog-open="views.iecImport" @close-dialog="closeImportDialog('iecImport')" />
   </v-container></template>
 
 <script lang="ts" setup>
@@ -282,7 +282,7 @@
       return
     }
 
-    const targetCursor = previousCursors.value.at(-1)
+    const targetCursor = previousCursors.value.at(-1) ?? null
 
     if (!await loadPage(targetCursor)) {
       return
@@ -386,6 +386,12 @@
       const index = cdData.value.indexOf(oldCd)
       cdData.value[index] = res
     }
+  }
+
+  async function closeImportDialog (viewName: 'jsonImport' | 'aasxImport' | 'iecImport') {
+    setView(viewName, false, undefined)
+    previousCursors.value = []
+    await loadPage(null)
   }
 </script>
 

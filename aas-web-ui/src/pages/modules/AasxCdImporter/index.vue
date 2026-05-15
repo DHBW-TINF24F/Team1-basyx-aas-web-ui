@@ -235,13 +235,13 @@
 </template>
 
 <script setup lang="ts">
+  import type { ConceptDescriptionTableRow } from '@/types/ConceptDescriptionTable'
   import type * as aasCore from '@aas-core-works/aas-core3.1-typescript'
   import { computed, ref, watch } from 'vue'
+  import ConceptDescriptionTableView from '@/components/UIComponents/ConceptDescriptionTableView.vue'
   import { extractCdsFromAasx } from '@/composables/AAS/AASXImport'
   import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient'
   import { useNavigationStore } from '@/store/NavigationStore'
-  import ConceptDescriptionTableView from '@/components/UIComponents/ConceptDescriptionTableView.vue'
-  import type { ConceptDescriptionTableRow } from '@/types/ConceptDescriptionTable'
 
   defineOptions({
     inheritAttrs: false,

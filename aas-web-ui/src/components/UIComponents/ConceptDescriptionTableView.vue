@@ -15,8 +15,8 @@
         density="compact"
         :headers="tableHeaders"
         :items="rows"
-        :search="tableSearch"
         :items-per-page="itemsPerPage"
+        :search="tableSearch"
       >
         <template v-if="selectable" #[`header.selected`]>
           <v-checkbox-btn
@@ -72,8 +72,8 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, ref } from 'vue'
   import type { ConceptDescriptionTableRow } from '@/types/ConceptDescriptionTable'
+  import { computed, ref } from 'vue'
 
   const props = withDefaults(defineProps<{
     rows: ConceptDescriptionTableRow[]
