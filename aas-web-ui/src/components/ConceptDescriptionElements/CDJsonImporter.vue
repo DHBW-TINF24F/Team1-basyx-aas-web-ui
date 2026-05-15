@@ -37,9 +37,12 @@
 </template>
 
 <script setup lang="ts">
+  import { count } from 'node:console'
   import { jsonization } from '@aas-core-works/aas-core3.1-typescript'
   import { ref } from 'vue'
+  import { s } from 'vue-router/dist/options-D5Ta7zF4.mjs'
   import { useCDRepositoryClient } from '@/composables/Client/CDRepositoryClient'
+  import { useNavigationStore } from '@/store/NavigationStore'
   const { fetchCdById, postConceptDescription, putConceptDescription } = useCDRepositoryClient()
 
   const props = defineProps({
@@ -56,53 +59,104 @@
   const dialogOpen = ref<boolean>(props.dialogOpen)
 
   const selectedFiles = ref<File[]>([])
-  const jsonContents = ref<unknown[]>([])
   const results = ref<Array<any>>([])
+
+  const navigationStore = useNavigationStore()
 
   async function processFiles () {
     await extractFiles()
-    await validateFiles()
-    console.log('after validate')
     await importCds()
-    console.log('after import')
+    closeDialog()
   }
 
   async function extractFiles () {
+    const failedFileExtractions: Array<string> = []
+    const failedFileValidations: Array<string> = []
     for (const file of selectedFiles.value) {
       if (!file.name.toLowerCase().endsWith('.json')) {
         continue
       }
+      let json: unknown = ''
 
       try {
         const text = await file.text()
-        const parsed = JSON.parse(text)
+        json = JSON.parse(text)
+      } catch {
+        failedFileExtractions.push(file.name)
+        continue
+      }
 
-        jsonContents.value.push(parsed)
-      } catch {}
+      try {
+        const converted = jsonization.conceptDescriptionFromJsonable(json as jsonization.JsonObject)
+        if (converted.value && converted.value.id) {
+          results.value.push(converted.value)
+        } else {
+          failedFileValidations.push(file.name)
+        }
+      } catch {
+        failedFileValidations.push(file.name)
+      }
+    }
+    if (failedFileExtractions.length > 0) {
+      navigationStore.dispatchSnackbar({
+        status: true,
+        timeout: 8000,
+        color: 'warning',
+        btnColor: 'buttonText',
+        text: `Failed to parse JSON Files: ${failedFileExtractions.join(', ')}`,
+      })
+    }
+    if (failedFileValidations.length > 0) {
+      navigationStore.dispatchSnackbar({
+        status: true,
+        timeout: 8000,
+        color: 'error',
+        btnColor: 'buttonText',
+        text: `The contents of the following JSON files are no Concept Description: ${failedFileValidations.join(', ')}'`,
+      })
     }
   }
 
-  async function validateFiles () {
-    for (const json of jsonContents.value) {
-      try {
-        const converted = jsonization.conceptDescriptionFromJsonable(json as jsonization.JsonObject)
-        if (converted.value) {
-          results.value.push(converted.value)
-        }
-      } catch {
-        continue
-      }
-    }
+  function removeDuplicates (arr: Array<any>) {
+    return Array.from(
+      new Map(
+        arr.map(obj => [JSON.stringify(obj), obj]),
+      ).values(),
+    )
   }
 
   async function importCds () {
+    let success = 0
+    let failed = 0
+
+    const deduplicatedResults = removeDuplicates(results.value)
     try {
-      for (const conceptDescription of results.value) {
+      for (const conceptDescription of deduplicatedResults) {
         if (!conceptDescription || !conceptDescription.id) continue
         const existing = await fetchCdById(conceptDescription.id)
-        await (existing && existing.keys > 0 ? putConceptDescription(existing) : postConceptDescription(conceptDescription))
+        const res = await (existing && existing.keys > 0 ? putConceptDescription(existing) : postConceptDescription(conceptDescription))
+        if (res) {
+          success++
+        } else {
+          failed++
+        }
       }
-    } catch {}
+    } catch (error) {
+      navigationStore.dispatchSnackbar({
+        status: true,
+        timeout: 8000,
+        color: 'error',
+        btnColor: 'buttonText',
+        text: `Something went wrong uploading Concept Descriptions: ${error}'`,
+      })
+    }
+    navigationStore.dispatchSnackbar({
+      status: true,
+      timeout: 8000,
+      color: 'success',
+      btnColor: 'buttonText',
+      text: `Successfully imported ${success} Concept Descriptions; ${failed} Failed.'`,
+    })
   }
 
   function closeDialog () {

@@ -1,6 +1,6 @@
 <template>
   <v-container>
-    <v-dialog v-model="dialogOpen" max-width="80vh" @click:outside="closeDialog">
+    <v-dialog v-model="dialogOpen" max-width="100vh" @click:outside="closeDialog">
       <v-card>
         <div class="scrollable">
           <index />
@@ -42,7 +42,6 @@
 <style scoped>
 .scrollable {
   overflow: scroll;
-  max-width: 80vh;
   max-height: 80vh;
 }
 </style>
